@@ -59,8 +59,10 @@ end
 ;; si t'est un rocketLuncher ou un explorer tu bouge aux pif 
 to FB-team-go-and-eat
   if ((breed = RocketLaunchers and (mem5 = 0)) or (breed = Explorers)) 
-    [random-move] ;; mvt aleatoir 
+    [random-move] ;; mvt aleatoir
+  ;;[FB-random-move -20 20 ]
 end
+
 
 to FB-team-harvesters-go-and-eat
   let w min-one-of (perceive-walls) [distance myself] ;; si je persoit un mure stock sa distance 
@@ -175,6 +177,7 @@ to FB-team-drive-harvesters
     FB-team-call-harvester [xcor] of food [ycor] of food 
   ]
 end
+
 ;;; fonctionement des explorer 
 ;;; si ta pas d'energie tu rentre a la base 
 ;;; si ta de l'energie tu bouge aleatoirement et tu donne aux harverster une food par tour que tu trouve 
@@ -220,32 +223,42 @@ to goRedRocketLauncher
 end
 
 to goRedHarvester
-  let f min-one-of perceive-food [ distance myself ]
-  while [(f != nobody) and (distance f <= 2)] [
-    take-food f
-    set f min-one-of perceive-food [ distance myself ]
-  ]
-
-  ifelse (mem4 = 1) or (carrying-food? > 500) or (energy < 100)
+  if ( (mem4 = 1 ) or (energy < 100) ) ;; si en train de revenir ou energi <00
   [
-    ; retour à la base
-    set mem4 1
-    ;; rentre à la base si certaines conditions sont vérifiées
-    FB-team-go-back-to-base
-    if (energy > 100) and (carrying-food? > 100) [ 
-      ;; détermine la distance de la base la plus proche
-      let b min-one-of my-bases [ distance myself ]
-      if (b != nobody) [
-        ;; si le robot est à moins de 10 de la base
-        if (distance b < 10)
-          [ plant-seeds color max-seeds ]
+    ifelse (energy > 100) and (carrying-food? > 100) ;; si je revien psq j'avais de la nouriture 
+    [ 
+      FB-plant-seed-ifcloser-than 10
+    ]
+    [ ;; on a plus d'energie rebien a la base 
+      set mem4 1
+      FB-team-go-back-to-base
+    ]
+  ]
+  ;; recupereation de nouriture proche 
+  FB-harvester-food-recolte
+  ;; si j'attein aux moin 500 de nouriture 
+  if ( carrying-food? > 500 ) 
+  [
+    ;; tente d'apler un explorer pour le transport 
+    let ex min-one-of perceive-specific-robots color Explorers [ distance myself] ;; recupere l'explorere le plus proche 
+    ifelse (ex != nobody and distance ex <= 2 ) ;; si je peut luis donné la nouriture 
+    [
+      give-food ex carrying-food?
+    ]
+    [
+      ifelse (ex != nobody and distance ex < 5) ;; si il est sufisament proche (distance changable )
+      [ ;;l'appeler 
+        FB-team-call-explorer-foodTransport
+        set mem4 0 ;; utiliser 2 apres avoir check qu'on ne s'en sert pas 
+      ]
+      [ ; retour à la base
+        set mem4 1 
+        FB-team-go-back-to-base
       ]
     ]
   ]
-  [
-    ;; cherche à manger
+    ;; cherche à manger // ne s'active pas si mouvement deja fait ( utilise luniciter du movement pas tic
     FB-team-harvesters-go-and-eat
-  ]
 end
 
 to goRedBase
@@ -270,6 +283,7 @@ end
 
 ;; procedure pour initialiser les explorers verts
 to initRedExplorer
+  
 end
 
 ;; procedure pour initialiser les rocket-launchers verts
@@ -286,3 +300,42 @@ to initRedBase
   new-Harvester self
   set mem6 7    ;; comme on ne peut créer qu'un seul robot par tour, mem6 sert à savoir combien de harvesters on doit encore créer
 end
+
+
+;;; function we add to the file 
+
+to FB-random-move[ minangle  maxangle ]  ;; seams to be less efficient 
+  ; choisit une orientation aleatoire entre -45 et +45 degres
+  let truemaxangle  maxangle - minangle
+  rt random truemaxangle - minangle
+  ; avance vers l'avant
+  if (free-ahead? speed = nobody) [forward-move speed]
+end
+
+to FB-team-call-explorer-foodTransport
+  let ex min-one-of perceive-specific-robots color Explorers [ distance myself] ;;trouve l'explorer le plus proche 
+  if (ex != nobody) [
+    ask ex [FB-team-set-target-xy [xcor] of myself [ycor] of myself harvesters ]
+  ]
+end
+to FB-plant-seed-ifcloser-than [ maxdistance ]
+  let b min-one-of my-bases [ distance myself ]
+  if (b != nobody) 
+  [
+    ;; si le robot est à moins de 10 de la base
+    if (distance b < maxdistance)
+    [ 
+      plant-seeds color max-seeds           
+    ]
+  ]
+end 
+
+to FB-harvester-food-recolte 
+  let f min-one-of perceive-food [ distance myself ]
+  while [(f != nobody) and (distance f <= 2)] [
+    take-food f
+    set f min-one-of perceive-food [ distance myself ]
+  ]
+end 
+
+
