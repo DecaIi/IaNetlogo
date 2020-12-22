@@ -183,7 +183,7 @@ end
 ;;; si ta de l'energie tu bouge aleatoirement et tu donne aux harverster une food par tour que tu trouve 
 to goRedExplorer
 ;  ifelse (carrying-food? > 1000) or (energy < 500) or ((Breed = RocketLaunchers) and (nb-missiles = 0))
-  ifelse (energy < 1000)
+  ifelse (energy < 1000 or carrying-food? > 500 ) 
   [ FB-team-go-back-to-base ] ;; rentre a la base 
   [ FB-team-go-and-eat ]      ;; mvm random ( ameliorable en donnant une direction)
   
@@ -225,7 +225,7 @@ end
 to goRedHarvester
   if ( (mem4 = 1 ) or (energy < 100) ) ;; si en train de revenir ou energi <00
   [
-    ifelse (energy > 100) and (carrying-food? > 100) ;; si je revien psq j'avais de la nouriture 
+    ifelse (energy > 100) and (carrying-food? > 400) ;; si je revien psq j'avais de la nouriture 
     [ 
       FB-plant-seed-ifcloser-than 10
     ]
@@ -241,12 +241,12 @@ to goRedHarvester
   [
     ;; tente d'apler un explorer pour le transport 
     let ex min-one-of perceive-specific-robots color Explorers [ distance myself] ;; recupere l'explorere le plus proche 
-    ifelse (ex != nobody and distance ex <= 2 ) ;; si je peut luis donné la nouriture 
+    ifelse ( far-from_base? and ex != nobody and distance ex <= 2 ) ;; si je peut luis donné la nouriture 
     [
       give-food ex carrying-food?
     ]
     [
-      ifelse (ex != nobody and distance ex < 5) ;; si il est sufisament proche (distance changable )
+      ifelse (far-from_base? and ex != nobody and distance ex < 5) ;; si il est sufisament proche (distance changable )
       [ ;;l'appeler 
         FB-team-call-explorer-foodTransport
         set mem4 0 ;; utiliser 2 apres avoir check qu'on ne s'en sert pas 
@@ -298,6 +298,7 @@ end
 to initRedBase
   ; crée des explorers, des harvesters et des rocket-launchers
   new-Harvester self
+  set mem5 5    ;;
   set mem6 7    ;; comme on ne peut créer qu'un seul robot par tour, mem6 sert à savoir combien de harvesters on doit encore créer
 end
 
@@ -337,5 +338,8 @@ to FB-harvester-food-recolte
     set f min-one-of perceive-food [ distance myself ]
   ]
 end 
-
+to-report far-from_base?
+  let b min-one-of my-bases [ distance myself ]
+  report (b != nobody and distance b > 20)  
+end
 
