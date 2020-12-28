@@ -202,22 +202,7 @@ to-report FB-Team-maxEnergie
        report explorer-nrj
    ]
 end
-;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; mvm handler 
-;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-to FB-Team-Handel-Targeted-mvm 
-  if(Fb-team-on-State-ShouldGoxy)
-  [
-    Fb-Team-move-towards-target 
-  ]
-end 
-
-to Fb-Team-Handel-Base-Return-mvm
-  if(FB-Team-on-State-ShouldGoBase)[
-    FB-Team-go-back-to-my-Base 
-  ]
-end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;; energy handeler 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -226,9 +211,23 @@ to FB-team-ask-for-energy [ b n ] ;; ask to base b to give myself n energy if it
   ask b [ if (energy > 1000) [ give-energy myself n ]]
 end
 
-to-report FB-Team-Need energy 
-;;;;;;;;;;;;;;;;;
+to-report FB-Team-Need-energy 
+  report energy < 1000
+end
+
+;;;;;;;;;
+;; state change handler 
+;;;;;;;;;
+;;set state to return base if need  
+to FB-Team-Handel-Return-Base-State 
+  if (energy < 1000 or (breed = RocketLaunchers and nb-missiles = 0) )[
+    set mem1 FB-Tem-Set-State 1 
+  ]
+end 
+
+;;;;;;;;;;;;;;;;;;;;;;
 ;;   State Report 
+;;;;;;;;;;;;;;;;;;;;;
 ;; mem1[1] > etas 
 ;;  etat 0 => Etat basique (par défaut)
 ;;  etat 1 => retour base  
@@ -236,7 +235,7 @@ to-report FB-Team-Need energy
 ;;;;;;;;;;;;;;;;;;;;;
 
 to-report FB-Team-on-State-BasicState
-  report item 1 mem1 0
+  report item 1 mem1 = 0
 end
 
 to-report Fb-team-on-State-ShouldGoxy
@@ -244,18 +243,23 @@ to-report Fb-team-on-State-ShouldGoxy
 end
 
 to-report FB-Team-on-State-ShouldGoBase
-  report item 2 mem1 = 1
+  report item 1 mem1 = 1
 end 
 
+to-report FB-Tem-Report-State
+  report item 1 mem1
+end
+;;;;;;;
+;; Stat Set 
+;;;;;;
+
+to-Report FB-Tem-Set-State [ state ]
+  report replace-item 1 mem1 state 
+end
+
 ;;;;;;;;;;;;;;;;; main program ;;;;;;;;;;;;;;
-
-
-to goRedHarvester
-end
-
-to goRedExplorer
-end
-
+ 
+;;;; Restock ;;;;
 to FB-Team-Refiull-energie 
     let b min-one-of my-bases [ distance myself ]
     if (FB-team-on-base b )[
@@ -263,34 +267,57 @@ to FB-Team-Refiull-energie
     ]
 end
 
-to FB-Ream-Restock-misiles
- let b min-one-of my-bases [ distance myself ] 
-  if (FB-team-on-base b )[
-    new-missile 5
-  ]
-end
-to FB-TEAM-Roketlauncher-movement-handler
-  ;; to do 
+to FB-Ream-Restock-misiles [ n ] ;;n number of misilse 
+    new-missile n
 end
 
+;;;;;;;;;;; explorer ;;
+to FB-Team-Explorer-StateHandler [b]
+  ;;todo
+end
+to FB-TEAM-Explorer-movement
+  ;;todo
+end
+to goRedExplorer
+  ;;todo 
+end
+
+;;;;;;;;;;;;;; harvester ;;;;;;;;;;;
+to FB-Team-Harverster-StateHandler [b]
+  ;;todo
+end
+
+to FB-TEAM-Harvester-movement
+  ;;todo
+end
+
+to goRedHarvester
+  ;;todo 
+end
+
+;;;;;;;;;;;Roket luncher ;;;;;;;;;
+to FB-Team-RocketLauncher-State-Handler [ b ] ;;  b closest base 
+  if (FB-team-on-base b and ( item 1 mem1 = 1 ) )[set mem1 FB-Tem-Set-State 0] ;;si on retournais a la base est qu'on est en contact c'est bo
+  FB-Team-Handel-Return-Base-State  ;;  si pas d'energie ou pas de misile revien a la base 
+end
+
+to FB-TEAM-Roketlauncher-movement
+  if(FB-Team-on-State-ShouldGoBase)[FB-Team-go-back-to-my-Base]
+  if(Fb-team-on-State-ShouldGoxy) [ Fb-Team-move-towards-target ]
+  random-move
+end
 
 to goRedRocketLauncher
-  FB-Team-Refiull-energie
-  if(nb-missiles = 0 )
-  [
-    FB-Ream-Restock-misiles
+  let b min-one-of my-bases [ distance myself ] ;; b closest base 
+  if( FB-team-on-base b ) [
+    FB-Team-Refiull-energie
+    if(nb-missiles = 0 )
+    [
+      FB-Ream-Restock-misiles 5 ;;; todo calculer le nombre de misilses a restock 
+    ]
   ]
-  let b min-one-of my-bases [ distance myself ]
-  if (FB-team-on-base b and ( item 1 mem1 = 1 ) )
-            [    
-                set mem1 replace-item 1 mem1 0 ;; libre 
-            ]
-   ifelse ( energy < 1000  or nb-missiles = 0 )[
-        FB-Team-go-back-to-my-Base
-   ][
-    random-move 
-   ]
-       
+  FB-Team-RocketLauncher-State-Handler b ;; change the state if neeeded 
+  FB-TEAM-Roketlauncher-movement      
 end
 
 
@@ -388,7 +415,7 @@ end
 to initRedBase
   set mem1 [0 0 0 0 0 0 0 0] ;; 7 
   set mem1 FB-team-Increment-List mem1 0 1 ;; intit tick
-  set mem1 FB-team-Increment-List mem1 1 5 ;;créer 5 explorer
-  set mem1 FB-team-Increment-List mem1 2 5 ;;créer 5 harverster
+  set mem1 FB-team-Increment-List mem1 1 0 ;;créer 5 explorer
+  set mem1 FB-team-Increment-List mem1 2 0 ;;créer 5 harverster
   set mem1 FB-team-Increment-List mem1 3 5 ;;créer 5 roketluncher
 end
