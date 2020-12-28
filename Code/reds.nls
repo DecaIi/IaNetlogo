@@ -147,31 +147,6 @@ to FB-team-call-harvester [ x y ]
   if (h != nobody) [ ask h [ FB-team-set-target-xy x y ]]
 end
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; enemy targeting and shooting
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;;cherche une cible si on trouve une cible pas en etas chasse si onoreste a l'etas defaut 
-;; si on etais a l'etas chasse 
-to Fb-team-robot-try-select-ennemi-target 
-    let h min-one-of perceive-robots ennemy [ distance myself ]
-    ifelse ( h != nobody ) [
-        FB-team-set-target-t h 
-        set mem1 replace-item 1 mem1 10 ;; mem1[1] = 10
-    ][
-        if ( item 1 mem1 = 10 )[ ;; si on etais en etas de tire 
-            set mem0 replace-item 1 mem1 0
-        ]
-    ]
-end
-
-;; si on est a l'etas a une cible a tiré tire 
-to Fb-Team-robot-try-shoot 
-    if( item 1 mem1 = 10) [
-        ;;launch-roket towardsxy item 0 mem0 item 1 mem0  
-    ]
-end
-
 to FB-team-drive-harvesters
   let food one-of perceive-food
   if (food != nobody) [
@@ -179,7 +154,46 @@ to FB-team-drive-harvesters
   ]
 end
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; enemy targeting and shooting
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+to Fb-team-base-try-select-ennemi-target-and-shoot
+  let r min-one-of perceive-robots ennemy [distance myself] 
+  set mem3 0
+  if ( r != nobody ) 
+  [
+   if ( not any? perceive-robots-in-cone color towards r) [ 
+    launch-faf r 
+    launch-rocket towardsxy [xcor] of r [ycor] of r
+    set mem3 1
+    ]
+  ]
+    
+end
+
+;;cherche une cible si on trouve une cible pas en etas chasse si onoreste a l'etas defaut 
+;; si on etais a l'etas chasse 
+to Fb-team-robot-try-select-ennemi-target 
+    let h min-one-of perceive-robots ennemy [ distance myself ]
+    ifelse ( h != nobody ) [
+    FB-team-set-target-t h
+        set mem1 replace-item 1 mem1 10 ;; mem1[1] = 10
+    ][
+        if ( item 1 mem1 = 10 )[ ;; si on etais en etas de tire 
+            set mem1 replace-item 1 mem1 0
+        ]
+    ]
+end
+
+;; si on est a l'etas a une cible a tiré tire 
+to Fb-Team-robot-try-shoot 
+    if( item 1 mem1 = 10) [
+    launch-faf  mem0
+    launch-rocket towardsxy [xcor] of mem0 [ycor] of mem0
+  ]
+    ;;[ launch-faf mem0 set mem5 0 ]
+end
 
 ;;;;;;;;;;;;;;;;;;; 
 ;;   utile 
@@ -296,6 +310,7 @@ to goRedHarvester
 end
 
 ;;;;;;;;;;;Roket luncher ;;;;;;;;;
+
 to FB-Team-RocketLauncher-State-Handler [ b ] ;;  b closest base 
   if (FB-team-on-base b and ( item 1 mem1 = 1 ) )[set mem1 FB-Tem-Set-State 0] ;;si on retournais a la base est qu'on est en contact c'est bo
   FB-Team-Handel-Return-Base-State  ;;  si pas d'energie ou pas de misile revien a la base 
@@ -316,13 +331,17 @@ to goRedRocketLauncher
       FB-Ream-Restock-misiles 5 ;;; todo calculer le nombre de misilses a restock 
     ]
   ]
+  
   FB-Team-RocketLauncher-State-Handler b ;; change the state if neeeded 
-  FB-TEAM-Roketlauncher-movement      
+  FB-TEAM-Roketlauncher-movement   
+  
+  Fb-team-robot-try-select-ennemi-target
+  Fb-Team-robot-try-shoot 
+  
+  
 end
 
-
 ;;;;;;;;;;;;;;;;;; Base ;;;;;;;;;;;;;;;;;;;;;;
-
 
 ;; creat an explorer and decrement the number of explorer to creat 
 to FB-team-creat-explorer
@@ -373,6 +392,9 @@ end
 to goRedBase
   FB-Team-Base-increment-tick   
   Fb-Team-Base-new-robot-if-should  
+  Fb-team-base-try-select-ennemi-target-and-shoot
+  ;;new-missile 1
+  ;;new-faf 1
 end  
 
 
