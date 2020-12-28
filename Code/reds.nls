@@ -1,376 +1,179 @@
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; le code de l'equipe verte basique
-;; préfixe : red-team
-;;
-;; mem0 et mem1 : coordonnees d'une cible
-;; mem5 : indique si le robot a ou non une cible sélectionnée
-;; mem4 : indique si un harvester est en mode retour à la base
-;; mem6 : le nb de harvesters à créer
-;; mem7 : le nb de rocket-launchers à créer
-;; mem8 : le nb d'explorers à créer
-;;
-;; Pour les explorers :
-;; mem0 : coordonnées de la base
-;; mem1 : coordonnées de la base adverse
-;; mem3 : état de l'explorer
-;;   -> -1 : se déplace à 10 unités horizontales de la base
-;;   -> 0 : recherche de la base adverse
-;;   -> 1 : informe la base des coordonnées de la base adverse
-;;   -> 2 : retourne à la base adverse
-;;   -> 3 : écrase les plantations adverses
-;;   -> 4 : suicide contre la base adverse
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Base :
+;;   mem0 : [
+;;     0 : coordonnées de la zone d'attente pour les robots explorers attaquants
+;;   ]
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-to red-team-ask-for-energy [ b n ] ;; ask to base b to give myself n energy if it energy > 1000
-  ask b [ if (energy > 1000) [ give-energy myself n ]]
-end
-
-;;
-;; rentre à la base et si le robot transporte plus de 1000 unités de nourriture ou si son énergie est inférieure à 500 ou si c'est un rocket-launcher qui n'a plus de missiles
-;;
-to red-team-go-back-to-base
-  ;; détermine la base la plus proche
-  let b min-one-of my-bases [ distance myself ]
-  if (b != nobody) [ ;; il ya aux une base la plus proce 
-    if ((breed = Harvesters) and (distance b > 10) and (distance b < 11)) [drop-wall] ;; si transporteur autour de la base depose le mure 
-    ;; si le robot est arrivé à la base
-    ifelse (distance b <= 2)
-      [ 
-        ;; dépose sa nourriture
-        give-food b carrying-food?
-        ;; demande de l'énergie si il reste moins de 1000
-        if (energy < 1000) [ red-team-ask-for-energy b 300 ]
-        ;; demande de l'énergie pour créer 5 missiles
-        if ((Breed = RocketLaunchers) and (nb-missiles = 0)) 
-          [
-            red-team-ask-for-energy b 500
-            new-missile 5
-          ]
-        set mem4 0
-        ;; fait demi-tour
-        rt 180
-      ]
-    ;; esle
-      [
-        ;; s'oriente vers la base avec un peu d'aléatoire
-        set heading towards b - 20 + random 40
-        ;; fait un demi tour si il y a du monde devant
-        ifelse (free-ahead? speed = nobody)  
-          [ 
-            forward-move speed 
-          ]
-          ;;else 
-          [ 
-            rt random 360 if (free-ahead? 2 = nobody)[forward-move speed]
-          ]
-      ]
-    ]    
-end
-;; si t'est un rocketLuncher ou un explorer tu bouge aux pif 
-to red-team-go-and-eat
-  if ((breed = RocketLaunchers and (mem5 = 0)) or (breed = Explorers))
-    [random-move] ;; mvt aleatoir 
-end
-
-to red-team-harvesters-go-and-eat
-  let w min-one-of (perceive-walls) [distance myself] ;; si je persoit un mure stock sa distance 
-  let b min-one-of my-bases [ distance myself ] ;; b = distance a la base 
-  if ((w != nobody) and ((distance b < 10) or (distance b > 11))) [take-wall w] ;; si je suis pas a 10 de distance de la base prend le mure 
-  let f min-one-of perceive-food [ distance myself ] ;; si je perosit de la nouriture stock sa distance
-  ifelse (f != nobody) 
-  [  ;; si j'ai persu de la nouriture 
-    ifelse (distance f) <= 2 ;; si la nouriture est plus proche que 2 unité ( je peut la prendre )
-      [ take-food f ] ;; je la prend 
-      ;;else 
-      [ 
-        set heading towards f - 20 + random 40 ;; vas vers la nouriture 
-        ifelse (free-ahead? speed = nobody) 
-          [ forward-move speed ]
-          ;else
-          [ rt random 360 if (free-ahead? 2 = nobody) [ forward-move speed ]]
-      ]
-  ]
-  ;;else 
-  [
-    ifelse (mem5 = 1) ;; si le robot a une cible  
-    [ 
-      ifelse (distancexy mem0 mem1 > 1) ;; distance (position ) to (mem0 , mem1 )  ou meme0, meme 1 = x,y de la cible  
-      [
-        set heading towardsxy mem0 mem1 
-        ifelse (free-ahead? speed = nobody) [ forward-move speed ][ rt random 360 if (free-ahead? 2 = nobody) [ forward-move speed ]]
-      ]
-      [ set mem5 0 ] ;; plus de cible 
-    ]
-    [ random-move ] ;; bouge aleatoiremeent
-  ]
-end
-
-;;
-;; la mémoire mem5 est à
-;; - 0 si le robot n'a pas de cible sélectionnée
-;; - 1 si le robot a une cible sélectionnée
-;;
-to-report red-team-no-target?
-  report mem5 = 0
-end
-;; save la position de la target dans meme0 meme 1 et met mem5 a 1
-to red-team-set-target-xy [ x y espece ]
-  set mem0 x set mem1 y set mem2 espece set mem5 1
-end
-
-;; save la position de la target dans meme0 meme 1 et met mem5 a 2
-to red-team-set-target-t [ t espece ]
-  set mem0 t set mem2 espece set mem5 2
-end
-;; di
-to red-team-set-food-target [ x y ]
-  if (red-team-no-target?) [ set mem0 x set mem1 y set mem5 1 ] 
-end
-;;envoi un roket luncher en x,y
-to red-team-call-rocket-launcher-xy [ x y espece ]
-  let rl min-one-of perceive-specific-robots color RocketLaunchers [ distancexy x y ]
-  if (rl != nobody) [ ask rl [ red-team-set-target-xy x y espece ]]
-end
-;;envoi un roket luncher en t ?
-to red-team-call-rocket-launcher-t [ t espece ]
-  let rl min-one-of perceive-specific-robots color RocketLaunchers [ distance t ]
-  if (rl != nobody) [ ask rl [ red-team-set-target-t t espece ]]
-end
-;;envoi un explorer en x,y
-to red-team-call-explorer [ x y espece ]
-  let ex one-of perceive-specific-robots color Explorers
-  if (ex != nobody) [
-    ask ex [ red-team-set-target-xy x y espece ]
-  ]
-end
-;;envoi un explorer en x,y
-to red-team-call-harvester [ x y ]
-  let h min-one-of perceive-specific-robots color harvesters [ distancexy x y ]
-  if (h != nobody) [ ask h [ red-team-set-food-target x y ]]
-end
-
-;;
-;; essaye de sélectionner une cible à viser
-;;
-to red-team-select-target
-  ;; si le robot n'a pas une base adverse comme cible
-  if (red-team-no-target?)
-  [
-    ;; il essaye de percevoir un robot ennemi (le plus proche de lui)
-    let h min-one-of perceive-robots ennemy [ distance myself ]
-    ;; si il en a vu un, il mémorise ses coordonnées et vérouille la cible
-    ifelse ( h != nobody ) [
-      set mem0 h
-      set mem2 [breed] of h
-      set mem5 2
-    ]
-    ;; sinon, il se dévérouille
-    [ set mem5 0 ]
-  ]
-end
-;; protocol de tir 
-to red-team-shoot 
-  if (not red-team-no-target?)
-  [
-    ifelse (mem5 = 1)
-    [ launch-rocket towardsxy mem0 mem1 set mem5 0 ]
-    [ launch-faf mem0 set mem5 0 ]
-  ]
-  
-end
-;; dirige un harvesters jusque de la nourture persu
-to red-team-drive-harvesters
-  let food one-of perceive-food
-  if (food != nobody) [
-    red-team-call-harvester [xcor] of food [ycor] of food 
-  ]
-end
-;;; fonctionement des explorer 
-;;; si ta pas d'energie tu rentre a la base 
-;;; si ta de l'energie tu bouge aleatoirement et tu donne aux harverster une food par tour que tu trouve 
 to goRedExplorer
-  FB-step-on-plantations-behavior  ;; écrase les plantations adverses
+  if (item 0 mem1 = 2) ;; Type explorer attaquant/soldat
+  [
+    FB-team-goExplorer2
+  ]
 end
 
 to goRedRocketLauncher
-;  ifelse (carrying-food? > 1000) or (energy < 500) or ((Breed = RocketLaunchers) and (nb-missiles = 0))
-  ifelse (energy < 1000) or (nb-missiles = 0)
-  [
-    ;; rentre à la base si certaines conditions sont vérifiées
-    red-team-go-back-to-base
-  ]
-  [
-    ;; sinon sélectionne une cible
-    red-team-select-target
-    ifelse (red-team-no-target?)
-    ;; si pas de cible, cherche à manger
-    [ red-team-go-and-eat ]
-    ;; sinon tire
-    [ red-team-shoot ]
-  ]
-  
-  ;; crée un nouveau missile si plus de 3000 unités d'énergie
-  if ((energy > 3000) and (nb-missiles < 5)) [ new-missile 1 ]
 end
 
 to goRedHarvester
-  let f min-one-of perceive-food [ distance myself ]
-  while [(f != nobody) and (distance f <= 2)] [
-    take-food f
-    set f min-one-of perceive-food [ distance myself ]
-  ]
-
-  ifelse (mem4 = 1) or (carrying-food? > 500) or (energy < 100)
-  [
-    ; retour à la base
-    set mem4 1
-    ;; rentre à la base si certaines conditions sont vérifiées
-    red-team-go-back-to-base
-    if (energy > 100) and (carrying-food? > 100) [ 
-      ;; détermine la distance de la base la plus proche
-      let b min-one-of my-bases [ distance myself ]
-      if (b != nobody) [
-        ;; si le robot est à moins de 10 de la base
-        if (distance b < 10)
-          [ plant-seeds color max-seeds ]
-      ]
-    ]
-  ]
-  [
-    ;; cherche à manger
-    red-team-harvesters-go-and-eat
-  ]
 end
 
 to goRedBase
-  ;; crée un nouveau robot si il reste des demandes de création dans le pipe (mem6, mem7 ou mem8)
-  ifelse (mem6 > 0) [ new-Harvester self set mem6 mem6 - 1 ]
-  [ ifelse (mem7 > 0) [ new-RocketLauncher self set mem7 mem7 - 1 ]
-  [ if (mem8 > 0) [ new-Explorer self set mem8 mem8 - 1 ]]]
-  
-  if (nb-missiles < 10) and (energy > 1000) [ new-missile 50 ]
-  if (nb-fafs < 10) and (energy > 1000) [ new-faf 10 ]
-  if (energy > 12000) [ ifelse (random 2 = 0) [ set mem6 mem6 + 1 ][ifelse (random 2 = 0) [ set mem7 mem7 + 1 ][ set mem8 mem8 + 1 ]]]
-
-  let t one-of perceive-specific-robots ennemy rocketlaunchers
-  if (t != nobody) [
-    ;; regarde s'il y a des robots amis en direction de la cible potentielle t avant de tirer
-    if (not any? perceive-robots-in-cone color towards t) [ launch-faf t ]
-  ]
 end
 
-;; procedure pour initialiser les explorers rouges
 to initRedExplorer
-  set mem3 -1 ;; Etat recherche de la base adverse
-  
-  let b min-one-of my-bases [ distance myself ] ;; détermine la base la plus proche
-  set mem0 list [xcor] of b [ycor] of b ;; Enregistre les coordonnées de la base
 end
 
-;; procedure pour initialiser les rocket-launchers rouges
 to initRedRocketLauncher
 end
 
-;; procedure pour initialiser les harvesters rouges
 to initRedHarvester
 end
 
-;; procedure pour initialiser les bases rouge
 to initRedBase
-  ; crée des explorers, des harvesters et des rocket-launchers
-  new-Harvester self
-  set mem6 7    ;; comme on ne peut créer qu'un seul robot par tour, mem6 sert à savoir combien de harvesters on doit encore créer
+  set mem0 (list (list (xcor + 10) ycor)) ;; Initialisation des coordonnées de la zone d'attente
+  new-Explorer self
+  let ex min-one-of perceive-specific-robots color Explorers [distance myself]
+  ask ex [ FB-team-initExplorer 2 ]
 end
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; Explorers : comportement d'écrasement des plantations adverses
+;;  Base
 ;;
-to FB-step-on-plantations-behavior
-  if (mem3 = -1) ;; se déplace à 10 unités horizontales de la base
-  [
-    FB-move-towards-xy ((item 0 mem0) + 10) (item 1 mem0)
-    
-    if ((distancexy ((item 0 mem0) + 10) (item 1 mem0)) < 2)
-    [
-      set mem3 0
-    ]
-  ]
-  if (mem3 = -2)
-  [
-  ]
-  if (mem3 = 0)
-  [
-    FB-move-towards-xy (xcor + 10) (item 1 mem0) ;; se déplace sur l'axe x à hauteur de sa base
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-    let b min-one-of (perceive-base ennemy) [ distance myself ]
-    if (b != nobody)
-    [
-      set mem1 list [xcor] of b [ycor] of b
-      set mem3 1
-    ]
-  ]
-  if (mem3 = 1)
+to-report FB-team-askBaseWaitingZoneCoordinates
+  report item 0 mem0
+end
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;  Explorer tous types
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+to FB-team-initExplorer [ t ] 
+  if (t = 2) ;; Type explorer attaquant/soldat
   [
-    FB-move-towards-xy (item 0 mem0) (item 1 mem0)
-    let b min-one-of my-bases [ distance myself ]
-    if (b != nobody)
-    [
-      if (distance b <= 2) ;; Si le robot est arrivé à la base
-      [
-        set mem3 2 ;; TODO Donner les coordonnées de la base adverse à notre base
-      ]
-    ]
-  ]
-  if (mem3 = 2)
-  [
-    FB-move-towards-xy (item 0 mem1) (item 1 mem1)
-    
-    let b min-one-of (perceive-base ennemy) [ distance myself ]
-    if (b != nobody)
-    [
-      set mem3 3
-    ]
-  ]
-  if (mem3 = 3)
-  [
-    FB-wander-around (item 0 mem1) (item 1 mem1) base-perception
-    
-    if (energy < 500)
-    [
-      set mem3 4
-    ]
-  ]
-  if (mem3 = 4)
-  [
-    set heading towardsxy (item 0 mem1) (item 1 mem1)
-    forward-move speed
+    set mem1 (list 2 0)
+    FB-team-initExplorer2
+    FB-team-explorer2-setState-goNextToBase
   ]
 end
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; Se déplace vers (x, y)
+;;  Explorer 2 (Attaquant/Soldat)
 ;;
-to FB-move-towards-xy [ x y ]
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+to FB-team-initExplorer2
+  let b min-one-of my-bases [ distance myself ]
+  set mem0 [item 0 mem0] of b
+end
+
+to FB-team-goExplorer2
+  if (FB-team-explorer2-onState-goNextToBase) 
+  [
+    FB-team-explorer2-state-goNextToBase
+  ]
+  if (FB-team-explorer2-onState-waitForChief) 
+  [
+    FB-team-explorer2-state-waitForChief
+  ]
+end
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Etats d'Explorer 2
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+to FB-team-explorer2-state-goNextToBase
+  ifelse ((distancexy (item 0 mem0) (item 1 mem0)) > 8) 
+  [
+    FB-team-move-towards-xy (item 0 mem0) (item 1 mem0)
+  ]
+  [
+    FB-team-explorer2-setState-waitForChief
+  ]
+end
+
+to FB-team-explorer2-state-waitForChief
+  FB-team-wander-around-xy (item 0 mem0) (item 1 mem0) 8
+end
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Fonctions de report d'états pour Explorer 2
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+to FB-team-explorer2-setState-goNextToBase
+  set mem1 replace-item 1 mem1 10 
+end
+
+to FB-team-explorer2-setState-waitForChief
+  set mem1 replace-item 1 mem1 11 
+end
+
+to-report FB-team-explorer2-onState-goNextToBase
+  report item 1 mem1 = 10 
+end
+
+to-report FB-team-explorer2-onState-waitForChief
+  report item 1 mem1 = 11 
+end
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;  Fonctions utiles
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+to FB-team-init-type-and-state [ t s ]
+  set mem1 (list t s)
+end
+
+to FB-team-set-target-xy [ x y ]
+    set mem0 replace-item 0 mem0 x
+    set mem0 replace-item 1 mem1 y
+end
+
+to FB-Team-move-forward
+    let nbTurn 0
+    ifelse(free-ahead? speed = nobody) 
+    [
+        forward-move speed
+    ][
+        rt 45 ;;regarde a droite 
+        ifelse(free-ahead? speed = nobody)
+        [
+            forward-move speed ;; avance 
+            rt -45         ;;remet toi dans la bonne direction
+        ][
+           rt -90          ;;regarde a gauche 
+           ifelse(free-ahead? speed = nobody)
+           [
+            forward-move speed ;;avance
+            rt 45          ;;remet toi dans la bonne direcion
+           ][
+               rt -45 ;;demis tours
+               if (free-ahead? speed = nobody) [
+                   forward-move speed ;; avance 
+        ]
+           ]  
+        ]
+    ]
+end
+
+to FB-team-move-towards-xy [ x y ]
   set heading towardsxy x y  
-  ;; fait un demi tour si il y a du monde devant
-  ifelse (free-ahead? speed = nobody)  
-  [ 
-    forward-move speed 
-  ]
-  ;;else 
-  [ 
-    rt random 360 if (free-ahead? 2 = nobody)[forward-move speed]
-  ]
+  Fb-Team-move-forward
 end
 
-;;
-;; Se déplace autour de (x, y) avec un rayon radius
-;;
-to FB-wander-around [ x y radius ]
+to FB-team-wander-around-xy [ x y radius ]
   ifelse ((distancexy x y) > radius)
   [
-    FB-move-towards-xy (item 0 mem1) (item 1 mem1)
+    FB-Team-move-towards-xy x y
   ]
   [
     rt random 91 - 45
@@ -378,5 +181,3 @@ to FB-wander-around [ x y radius ]
     if (free-ahead? speed = nobody) [forward-move speed]
   ]
 end
-  
-  
