@@ -216,7 +216,6 @@ to FB-Ream-Restock-misiles
   ]
 end
 
-
 to goRedRocketLauncher
   FB-Team-Refiull-energie
   if(nb-missiles = 0 )
@@ -235,12 +234,45 @@ to goRedRocketLauncher
    ]
        
 end
+;; creat an explorer and decrement the number of explorer to creat 
+to FB-team-creat-explorer
+    new-Explorer self
+    FB-team-Increment-List mem1 3 -1
+end
+;; creat and harverster and decrement the number of harverster to creat 
+to FB-team-creat-harverster
+    new-Harvester self
+    FB-team-Increment-List mem1 2 -1
+end
+;; creat and roketluncher and decrement the number of roketluncher to creat 
+to FB-team-creat-roketluncher
+    new-RocketLauncher self
+    FB-team-Increment-List mem1 3 -1
+end
+;; creat robot if should creat it ( mem1 : )
+to Fb-Team-Base-new-robot-if-should
+  if (item 1 mem1 > 0) [FB-team-creat-explorer]
+  if (item 2 mem1 > 0) [FB-team-creat-harverster]
+  if (item 3 mem1 > 0) [FB-team-creat-roketluncher]  
+   
+end
+;;;mem1 : [
+;;; 0 : nombre de tick passé depuis t0
+;;  1 : nombre d’explorer crée,
+;;  2 : nombre d’harverster crée 
+;;  3 : nombre d’roketluncher crée 
+;;  ]
+;;FB-team-Increment-List [ inputlist index increment]
 to goRedBase
+  FB-team-Increment-List mem1 0 1 ;;increment tick
+  Fb-Team-Base-new-robot-if-should 
 end  
+
 
 
 ;; procedure pour initialiser les explorers verts
 to initRedExplorer
+  set mem1 replace-item 3 mem1 3
 end
 
 ;; procedure pour initialiser les rocket-launchers verts
