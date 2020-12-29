@@ -142,10 +142,15 @@ end
 ;;envoi un harverset  en x,y
 to FB-team-call-harvester [ x y ]
   let h min-one-of perceive-specific-robots color harvesters [ distancexy x y ]
-  if (h != nobody) [ ask h [ FB-team-set-target-xy x y ]]
+  if (h != nobody) 
+  [ 
+    ask h [ 
+      FB-team-set-target-xy x y 
+    ]
+  ]
 end
 
-to FB-team-drive-harvesters
+to FB-team-drive-harvesters-on-peceive-food
   let food one-of perceive-food
   if (food != nobody) [
     FB-team-call-harvester [xcor] of food [ycor] of food 
@@ -257,6 +262,13 @@ to FB-Team-Handel-Return-To-Base-For-Deposing-Food
   [ set mem1 FB-Tem-Set-State 1]
 end
 
+to FB-Team-Return-To-Basic-State-On-Target
+  if (Fb-team-on-State-ShouldGoxy and FB-Team-Distance-To-Target <= 2)
+  [  
+    set mem1 FB-Tem-Set-State 0 
+  ]
+end
+
 
 ;;;;;;;;;;;;;;;;;;;;;;
 ;;   State Report 
@@ -306,22 +318,37 @@ end
 
 ;;;;;;;;;;; explorer ;;
 to FB-Team-Explorer-StateHandler [b]
-  ;;todo
-end
-to FB-TEAM-Explorer-movement
-  ;;todo
-end
-to goRedExplorer
-  ;;todo 
+  if (FB-team-on-base b and ( item 1 mem1 = 1 ) )[set mem1 FB-Tem-Set-State 0] ;;si on retournais a la base est qu'on est en contact c'est bo
+ ;; FB-Team-Handel-Return-Base-State  ;;  si pas d'energie ou pas de misile revien a la base 
+ ;; FB-Team-Handel-Return-To-Base-For-Deposing-Food ;; return to base if more thant 500 food cariing 
+  
 end
 
+to FB-TEAM-Explorer-movement
+  if(FB-Team-on-State-ShouldGoBase)[FB-Team-go-back-to-my-Base]
+  if(Fb-team-on-State-ShouldGoxy) [ Fb-Team-move-towards-target ]
+  random-move
+end
+to goRedExplorer
+  let b min-one-of my-bases [ distance myself ] ;; b closest base 
+  if( FB-team-on-base b ) [
+    FB-Team-Refiull-energie 
+  ]
+  FB-Team-Explorer-StateHandler b
+  FB-TEAM-Explorer-movement  
+  FB-team-drive-harvesters-on-peceive-food
+end
 
 
 ;;;;;;;;;;;;;; harvester ;;;;;;;;;;;
 to FB-Team-Harverster-StateHandler [b]
-   if (FB-team-on-base b and ( FB-Team-on-State-ShouldGoBase ) )[set mem1 FB-Tem-Set-State 0] ;;si on retournais a la base est qu'on est en contact c'est bo
-   FB-Team-Handel-Return-Base-State ;; return to base if nedd energy
-   FB-Team-Handel-Return-To-Base-For-Deposing-Food ;; return to base if more thant 500 food cariing 
+  if (FB-team-on-base b and ( FB-Team-on-State-ShouldGoBase ) )
+  [
+    set mem1 FB-Tem-Set-State 0
+  ] ;;si on retournais a la base est qu'on est en contact c'est bo
+  FB-Team-Handel-Return-Base-State ;; return to base if nedd energy
+  FB-Team-Handel-Return-To-Base-For-Deposing-Food ;; return to base if more thant 500 food cariing 
+  FB-Team-Return-To-Basic-State-On-Target
 end
 
 to FB-TEAM-Harvester-movement
@@ -439,6 +466,7 @@ to goRedBase
   FB-Team-Base-increment-tick   
   Fb-Team-Base-new-robot-if-should  
   Fb-team-base-try-select-ennemi-target-and-shoot
+  FB-team-drive-harvesters-on-peceive-food
   ;;new-missile 1
   ;;new-faf 1
 end  
@@ -483,7 +511,7 @@ end
 to initRedBase
   set mem1 [0 0 0 0 0 0 0 0] ;; 7 
   set mem1 FB-team-Increment-List mem1 0 1 ;; intit tick
-  set mem1 FB-team-Increment-List mem1 1 0 ;;créer 5 explorer
+  set mem1 FB-team-Increment-List mem1 1 5 ;;créer 5 explorer
   set mem1 FB-team-Increment-List mem1 2 5 ;;créer 5 harverster
-  set mem1 FB-team-Increment-List mem1 3 0 ;;créer 5 roketluncher
+  set mem1 FB-team-Increment-List mem1 3 5 ;;créer 5 roketluncher
 end
