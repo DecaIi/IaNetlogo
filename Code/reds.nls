@@ -431,7 +431,11 @@ end
 
 to FB-Team-Explorer-handleGoNextToBase
   if (FB-Team-on-State-BasicState) [
-    FB-Team-Explorer-setState-goNextToBase
+    let b min-one-of my-bases [distance myself]
+    if (b != nobody) [
+      FB-Team-set-target-xy ([item 0 mem0] of b) ([item 1 mem0] of b)
+      FB-Team-Explorer-setState-goNextToBase
+    ]
   ]
 end
 
@@ -773,6 +777,7 @@ end
 ;; 8 : type du prochain robot à créer
 ;;  ]
 to initRedBase
+  set mem0 list (xcor + 10) ycor
   set mem1 [0 [0 0 0] [0] [0] 0 [0 0 0] [0] [0] 0] ;; 7 
   set mem1 FB-team-Increment-List mem1 0 1 ;; intit tick
   FB-Team-Base-createExplorersWhenPossible 0 5 ;;créer 5 explorer de type 0
