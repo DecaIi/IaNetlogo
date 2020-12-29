@@ -1,502 +1,67 @@
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; Base :
-;;   mem0 : [
-;;     0 : coordonnées de la zone d'attente pour les robots explorers attaquants
-;;   ]
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; le code de l'equipe rouge 
+;; préfixe : FB-team
+;; robot : 
+;; mem0 cible x,y 
+;; mem1 type,etas 
+;;  etat 0 => Etat basique (par défaut)
+;;  etat 1 => retour base  
+;;  etat 2 => doit aller en position x,y ( mem0 )
+;; 
+;; base 
+;; mem1 : liste des truc a ce rapler a definir 
+;; mem8 : list des robot a créer 
+;; mem0 et mem1 : coordonnees d'une cible
+;; mem5 : indique si le robot a ou non une cible sélectionnée
+;; mem4 : indique si un harvester est en mode retour à la base
+;; mem4 [roketluncher ]: indique si un roquette luncher est en protection de la base 
+;; mem6 : le nb de harvesters à créer
+;; mem7 : le nb de rocket-launchers à créer
+;; mem8 : le nb d'explorers à créer
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-to goRedRocketLauncher
+
+;;;;;;
+;; movement primitives 
+;;;;;;
+
+to FB-team-move-towards-t [ t ]
+  set heading towards t  
+  Fb-Team-move-forward
 end
 
-to goRedHarvester
+;; monve on on x,y direction
+to FB-Team-move-towards-xy [ x y ]
+  set heading towardsxy x y  
+  Fb-Team-move-forward
 end
 
-to initRedRocketLauncher
+;;move on the target direction care meme 1 should be 2
+to Fb-Team-move-towards-target 
+    FB-Team-move-towards-xy item 0 mem0 item 1 mem0 
 end
 
-to initRedHarvester
+;; go back to base 
+to FB-Team-go-back-to-my-Base 
+    let b min-one-of my-bases [ distance myself ]
+    if (b != nobody and distance b > 2) [
+        set heading towards b
+        FB-Team-move-forward 
+    ]
 end
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;;  -----------------------------------------------------------------------------------------------------------------------BASE-----------------------------------------------------------------------------------------------------------------------
-;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-to initRedBase
-  set mem0 (list (list (xcor + 10) ycor)) ;; Initialisation des coordonnées de la zone d'attente
-  set mem1 (list 0 0 0 0 0 0 0 0 0)
-  set mem2 1
-  FB-team-base-createExplorerOfType 2
-end
-
-to goRedBase
-  if (mem2 < 10)
-  [
-    FB-team-base-createExplorerOfType 2
-    set mem2 (mem2 + 1)
-  ]
-end
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Fonctions utiles
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-to-report FB-team-askBaseWaitingZoneCoordinates
-  report item 0 mem0
-end
-
-to-report FB-team-getTypeOfNewRobot
-  report item 8 mem1
-end
-
-to FB-team-setTypeOfNewRobot [ t ]
-  set mem1 replace-item 8 mem1 t 
-end
-
-to FB-team-base-createExplorerOfType [ t ]
-  FB-team-setTypeOfNewRobot t
-  new-Explorer self
-end
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;;  -----------------------------------------------------------------------------------------------------------------------EXPLORERS------------------------------------------------------------------------------------------------------------------
-;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;;  --------------------------------------------Explorer tous types--------------------------------------------------------
-;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-to initRedExplorer
-  ;; Obtention du type du robot à sa création
-  let b min-one-of my-bases [ distance myself ]
-  FB-team-init-type-and-state ([FB-team-getTypeOfNewRobot] of b) 0
-  
-  if (FB-team-getType = 2) ;; Type explorer attaquant/groupe
-  [
-    FB-team-initExplorer2
-  ]
-  
-  if (FB-team-getType = 3) ;; Type explorer attaquant/soldat
-  [
-    FB-team-initExplorer3
-  ]
-  
-  if (FB-team-getType = 4) ;; Type explorer attaquant/chef
-  [
-    FB-team-initExplorer4
-  ]
-end
-
-to goRedExplorer
-  if (FB-team-getType = 2) ;; Type explorer attaquant/groupe
-  [
-    FB-team-goExplorer2
-  ]
-  
-  if (FB-team-getType = 3) ;; Type explorer attaquant/soldat
-  [
-    FB-team-goExplorer3
-  ]
-  
-  if (FB-team-getType = 4) ;; Type explorer attaquant/chef
-  [
-    FB-team-goExplorer4
-  ]
-end
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;;  Etats d'Explorer tous types
-;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;; Se dirige à côté de la base
-;; PREREQUIS : coordonnées de la zone d'attente dans mem0
-to FB-team-explorer-state-goNextToBase
-  FB-team-move-towards-xy (item 0 mem0) (item 1 mem0)
-end
-
-;; Se dirige à vers la base adverse
-;; PREREQUIS : coordonnées de la base amie dans mem0
-to FB-team-explorer-state-goToEnemyBase
-  FB-team-set-target-xy (xcor + 10) (item 1 mem0) ;; Se déplce uniquement sur x, à hauteur de la base
-  FB-team-move-towards-target
-end
-
-;; Ecrase les plantations
-to FB-team-explorer-state-trampleOnPlantation
-  let s min-one-of perceive-seeds ennemy [distance myself]
-  ifelse (s != nobody) ;; S'il y a des plantations, les écraser
-  [
-    FB-team-move-towards-t s
-  ]
-  [
-    FB-team-wander-around-target 10 ;; Sinon bouger autour de la base adverse dans un rayon de 10
-  ]
-end
-
-;; Suicide sur la base advers
-;; PREREQUIS : coordonnées de la base ennemie dans mem0
-to FB-team-explorer-state-suicideOnBase
+;; Suicide on target
+to FB-Team-suicideOnTarget
   let b min-one-of (perceive-base ennemy) [ distance myself ]
-  ifelse (b != nobody and (distance b) < 2) ;; Si on est assez proche de la base adverse, on fonce dessus sans s'arrêter
-  [
+  ifelse (b != nobody and (distance b) < 2) [ ;; Si on est assez proche de la base adverse, on fonce dessus sans s'arrêter
     forward-move speed
-  ]
-  [
+  ][
     FB-team-move-towards-target ;; Sinon on se dirige vers elle
   ]
 end
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;;  Fonctions de report d'états pour Explorer tous types
-;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-to FB-team-explorer-setState-goNextToBase
-  set mem1 replace-item 1 mem1 901 
-end
-
-to-report FB-team-explorer-onState-goNextToBase
-  report item 1 mem1 = 901 
-end
-
-to FB-team-explorer-setState-goToEnemyBase
-  set mem1 replace-item 1 mem1 902 
-end
-
-to-report FB-team-explorer-onState-goToEnemyBase
-  report item 1 mem1 = 902 
-end
-
-to FB-team-explorer-setState-trampleOnPlantation
-  set mem1 replace-item 1 mem1 903 
-end
-
-to-report FB-team-explorer-onState-trampleOnPlantation
-  report item 1 mem1 = 903
-end
-
-to FB-team-explorer-setState-suicideOnBase
-  set mem1 replace-item 1 mem1 904 
-end
-
-to-report FB-team-explorer-onState-suicideOnBase
-  report item 1 mem1 = 904
-end
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;;  --------------------------------------------Explorer type 2 (Attaquant/Groupe)-----------------------------------------
-;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-to FB-team-initExplorer2
-  let b min-one-of my-bases [ distance myself ]
-  set mem0 [item 0 mem0] of b
-  FB-team-explorer-setState-goNextToBase
-end
-
-to FB-team-goExplorer2
-  if (FB-team-explorer-onState-goNextToBase) 
-  [
-    FB-team-explorer-state-goNextToBase
-    if ((distancexy (item 0 mem0) (item 1 mem0)) < 5) ;; On passe à l'état suivant si on est dans un rayon de 6 du point d'attente
-    [
-      FB-team-explorer-setState-waitForCompanions
-    ]
-  ]
-  
-  if (FB-team-explorer-onState-waitForCompanions) 
-  [
-    FB-team-explorer-state-waitForCompanions
-    if (count (perceive-specific-robots color Explorers) with [(item 0 mem1) = 2] >= 10) ;; On passe à l'état suivant si il y a 10 companions au moins
-    [
-      FB-team-explorer-setState-goToEnemyBase
-    ]
-  ]
-  
-  if (FB-team-explorer-onState-goToEnemyBase)
-  [
-    FB-team-explorer-state-goToEnemyBase
-    let b min-one-of (perceive-base ennemy) [ distance myself ]
-    if (b != nobody) ;; On passe à l'état suivant si on perçoit la plantation
-    [
-      FB-team-set-target-t b
-      FB-team-explorer-setState-trampleOnPlantation
-    ]
-  ]
-  
-  if (FB-team-explorer-onState-trampleOnPlantation)
-  [
-    FB-team-explorer-state-trampleOnPlantation
-    ;; On passe à l'état suivant si notre énergie est inférieure à celle qui nous faudrait pour rejoindre la base adverse, avec une chance de nous tirer dessus de 25%
-    ;; et une sécurité de 0.5
-    if (energy < (distancexy (item 0 mem0) (item 1 mem0)) * (explorer-metabolism + missile-robot-damage / 4) + 0.5)
-    [
-      FB-team-explorer-setState-suicideOnBase
-    ]
-  ]
-  
-  if (FB-team-explorer-onState-suicideOnBase)
-  [
-    FB-team-explorer-state-suicideOnBase
-  ]
-end
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;;  Etats d'Explorer 2
-;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;; Attend ses companions
-;; PREREQUIS : coordonnées du point d'attente dans mem0
-to FB-team-explorer-state-waitForCompanions
-  FB-team-wander-around-xy (item 0 mem0) (item 1 mem0) 5
-end
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;;  Fonctions de report d'états pour Explorer 2
-;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-to FB-team-explorer-setState-waitForCompanions
-  set mem1 replace-item 1 mem1 201 
-end
-
-to-report FB-team-explorer-onState-waitForCompanions
-  report item 1 mem1 = 201 
-end
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;;  --------------------------------------------Explorer type 3 (Attaquant/Soldat)-----------------------------------------
-;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-to FB-team-initExplorer3
-  let b min-one-of my-bases [ distance myself ]
-  set mem0 [item 0 mem0] of b
-  FB-team-explorer-setState-goNextToBase
-end
-
-to FB-team-goExplorer3
-  if (FB-team-explorer-onState-goNextToBase) 
-  [
-    FB-team-explorer-state-goNextToBase
-    if ((distancexy (item 0 mem0) (item 1 mem0)) < 6) ;; On passe à l'état suivant si on est dans un rayon de 6 autour du point d'attente
-    [
-      FB-team-explorer-setState-waitForChief
-    ]
-  ]
-  
-  if (FB-team-explorer-onState-waitForChief) 
-  [
-    FB-team-explorer-state-waitForChief
-    if (FB-team-explorer-chiefHasArrived) ;; On passe à l'état suivant si le chef est arrivé
-    [
-      FB-team-explorer-setState-followChief
-    ]
-  ]
-  
-  if (FB-team-explorer-onState-followChief)
-  [
-    FB-team-explorer-state-followChief
-    ;; On passe à l'état suivant si notre énergie est inférieure à celle qui nous faudrait pour rejoindre la base adverse, avec une chance de nous tirer dessus de 25%
-    ;; et une sécurité de 0.5
-    if (energy < (distancexy (item 0 mem0) (item 1 mem0)) * (explorer-metabolism + missile-robot-damage / 4) + 0.5) 
-    [
-      FB-team-explorer-setState-suicideOnBase
-    ]
-  ]
-  
-  if (FB-team-explorer-onState-suicideOnBase)
-  [
-    FB-team-explorer-state-suicideOnBase
-  ]
-end
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;;  Etats d'Explorer 3
-;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;; Attend le chef
-;; PREREQUIS : coordonnées de la zone d'attente dans mem0
-to FB-team-explorer-state-waitForChief
-  FB-team-wander-around-xy (item 0 mem0) (item 1 mem0) 6
-end
-
-;; Suit le chef
-to FB-team-explorer-state-followChief
-  let chief FB-team-explorer-perceiveChief
-  if (chief != nobody)
-  [
-    FB-team-follow-t chief
-    FB-team-set-target-xy [item 0 mem0] of chief [item 1 mem0] of chief
-  ]
-end
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;;  Fonctions de report d'états pour Explorer 3
-;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-to FB-team-explorer-setState-waitForChief
-  set mem1 replace-item 1 mem1 301 
-end
-
-to-report FB-team-explorer-onState-waitForChief
-  report item 1 mem1 = 301 
-end
-
-to FB-team-explorer-setState-followChief
-  set mem1 replace-item 1 mem1 302 
-end
-
-to-report FB-team-explorer-onState-followChief
-  report item 1 mem1 = 302 
-end
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; Fonctions utiles
-;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;; Renvoie le chef le plus proche
-to-report FB-team-explorer-perceiveChief
-  let exs (perceive-specific-robots color Explorers) with [(item 0 mem1) = 4] ;; Perceive Explorers of type 3
-  report min-one-of exs [distance myself]
-end
-
-;; Informe l'explorer que le chef est arrivé
-to FB-team-explorer-informChiefArrived
-  set mem2 1
-end
-
-;; Renvoie true si on a été informé de l'arrivée du chef
-to-report FB-team-explorer-chiefHasArrived
-  report mem2 = 1
-end
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;;  --------------------------------------------Explorer type 4 (Attaquant/Chef)-------------------------------------------
-;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-to FB-team-initExplorer4
-  let b min-one-of my-bases [ distance myself ]
-  set mem0 [item 0 mem0] of b
-  FB-team-explorer-setState-goNextToBase
-end
-
-to FB-team-goExplorer4
-  if (FB-team-explorer-onState-goNextToBase) 
-  [
-    FB-team-explorer-state-goNextToBase
-    if ((distancexy (item 0 mem0) (item 1 mem0)) < 2) ;; On passe à l'état suivant si on est dans un rayon de 2 du point d'attente
-    [
-      FB-team-explorer-setState-informSoldiersOfArrival
-    ]
-  ]
-  
-  if (FB-team-explorer-onState-informSoldiersOfArrival)
-  [
-    FB-team-explorer-state-informSoldiersOfArrival
-    FB-team-explorer-setState-goToEnemyBase
-  ]
-  
-  if (FB-team-explorer-onState-goToEnemyBase)
-  [
-    FB-team-explorer-state-goToEnemyBase
-    let b min-one-of (perceive-base ennemy) [ distance myself ]
-    if (b != nobody) ;; On passe à l'état suivant si on perçoit la plantation
-    [
-      FB-team-set-target-t b
-      FB-team-explorer-setState-trampleOnPlantation
-    ]
-  ]
-  
-  if (FB-team-explorer-onState-trampleOnPlantation)
-  [
-    FB-team-explorer-state-trampleOnPlantation
-    ;; On passe à l'état suivant si notre énergie est inférieure à celle qui nous faudrait pour rejoindre la base adverse, avec une chance de nous tirer dessus de 25%
-    ;; et une sécurité de 0.5
-    if (energy < (distancexy (item 0 mem0) (item 1 mem0)) * (explorer-metabolism + missile-robot-damage / 4) + 0.5)
-    [
-      FB-team-explorer-setState-suicideOnBase
-    ]
-  ]
-  
-  if (FB-team-explorer-onState-suicideOnBase)
-  [
-    FB-team-explorer-state-suicideOnBase
-  ]
-end
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;;  Etats d'Explorer 4
-;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;; Informe les soldats de son arrivée
-to FB-team-explorer-state-informSoldiersOfArrival
-  let soldiers (perceive-specific-robots color Explorers) with [(item 0 mem1) = 2] ;; Perceive Explorers of type 2
-  ask soldiers [ FB-team-explorer-informChiefArrived ]
-end
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;;  Fonctions de report d'états pour Explorer 4
-;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-to FB-team-explorer-setState-informSoldiersOfArrival
-  set mem1 replace-item 1 mem1 401 
-end
-
-to-report FB-team-explorer-onState-informSoldiersOfArrival
-  report item 1 mem1 = 401 
-end
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;;  -----------------------------------------------------------------------------------------------------------------------FONCTIONS UTILES-----------------------------------------------------------------------------------------------------------
-;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-to FB-team-init-type-and-state [ t s ]
-  set mem1 (list t s)
-end
-
-to-report FB-team-getType
-  report item 0 mem1
-end
-
-to FB-team-set-target-t [ t ]
-  set mem0 replace-item 0 mem0 [xcor] of t 
-  set mem0 replace-item 1 mem0 [ycor] of t
-end 
-
-to FB-team-set-target-xy [ x y ]
-    set mem0 replace-item 0 mem0 x
-    set mem0 replace-item 1 mem0 y
-end
-
+;; handel torward movement and obstacles
 to FB-Team-move-forward
     let nbTurn 0
     ifelse(free-ahead? speed = nobody) 
@@ -504,7 +69,7 @@ to FB-Team-move-forward
         forward-move speed
     ][
         rt 45 ;;regarde a droite 
-        ifelse(free-ahead? speed = nobody)
+        ifelse(free-ahead? speed = nobody )
         [
             forward-move speed ;; avance 
             rt -45         ;;remet toi dans la bonne direction
@@ -516,33 +81,50 @@ to FB-Team-move-forward
             rt 45          ;;remet toi dans la bonne direcion
            ][
                rt -45 ;;demis tours
-               if (free-ahead? speed = nobody) [
+               if (free-ahead? speed = nobody )[
                    forward-move speed ;; avance 
-        ]
+               ]
            ]  
         ]
     ]
+
 end
 
-to FB-team-move-towards-target
-  FB-team-move-towards-xy (item 0 mem0) (item 1 mem0)  
+;; handel harverster grabing food on an area 
+to FB-team-harversers-go-on-food-if-detected 
+    let f min-one-of perceive-food [ distance myself]
+    if (f != nobody) 
+    [  ;; si j'ai persu de la nouriture 
+    ifelse (distance f) <= 2 ;; si la nouriture est plus proche que 2 unité ( je peut la prendre )
+      [ take-food f ] ;; je la prend 
+      ;;else 
+      [ 
+        set heading towards f
+        Fb-Team-move-forward 
+      ]
+    ]
+
+end
+;; handel wall taking 
+to Fb-team-harverser-go-take-wall 
+    let w min-one-of (perceive-walls) [distance myself]
+    if (w != nobody)[
+        ifelse (distance w <= 2)
+            [take-wall w] 
+            [
+                set heading towards w
+                FB-Team-move-forward
+            ]
+    ]
 end
 
-to FB-team-move-towards-t [ t ]
-  set heading towards t  
-  Fb-Team-move-forward
-end
-
-to FB-team-move-towards-xy [ x y ]
-  set heading towardsxy x y  
-  Fb-Team-move-forward
-end
-
-to FB-team-wander-around-target [ radius ]
+;; Random move around target in specified radius
+to FB-Team-wander-around-target [ radius ]
   FB-team-wander-around-xy (item 0 mem0) (item 1 mem0) radius
 end
 
-to FB-team-wander-around-xy [ x y radius ]
+;; Random move around x y in specified radius
+to FB-Team-wander-around-xy [ x y radius ]
   ifelse ((distancexy x y) > radius)
   [
     FB-Team-move-towards-xy x y
@@ -554,11 +136,647 @@ to FB-team-wander-around-xy [ x y radius ]
   ]
 end
 
-to FB-team-follow-t [ t ]
-  set heading towards t
-  set heading (heading + [heading] of t) / 2
-  if (distance t > 1)
-  [
-    FB-Team-move-forward
+;;;;;;;;;;;;;;;;;;;;;
+;;;; Target Setings
+;;;;;;;;;;;;;;;;;;;;;;;;
+to FB-team-set-target-xy [ x y ]
+    set mem0 replace-item 0 mem0 x
+    set mem0 replace-item 1 mem0 y
+end 
+;;set la target a t 
+to FB-team-set-target-t [ t ]
+  set mem0 t
+end
+
+;;;;;;;;;;;
+;; call robot to target 
+;;;;;;;;;;;
+
+;;envoi un roketluncher en x y
+to FB-team-call-rocket-launcher-xy [ x y ]
+  let rl min-one-of perceive-specific-robots color RocketLaunchers [ distancexy x y ]
+  if (rl != nobody) [ ask rl [ FB-team-set-target-xy x y ]]
+end
+;;envoi un roketluncher en T
+to FB-team-call-rocket-launcher-t [ t ]
+  let rl min-one-of perceive-specific-robots color RocketLaunchers [ distance t ]
+  if (rl != nobody) [ ask rl [ FB-team-set-target-t t  ]]
+end
+
+;;envoi un explorer en x,y
+to FB-team-call-explorer [ x y  ]
+  let ex one-of perceive-specific-robots color Explorers
+  if (ex != nobody) [
+    ask ex [ FB-team-set-target-xy x y ]
   ]
+end
+
+;;envoi un harverset  en x,y
+to FB-team-call-harvester [ x y ]
+  let h min-one-of perceive-specific-robots color harvesters [ distancexy x y ]
+  if (h != nobody) 
+  [ 
+    ask h [ 
+      FB-team-set-target-xy x y 
+    ]
+  ]
+end
+
+to FB-team-drive-harvesters-on-peceive-food
+  let food one-of perceive-food
+  if (food != nobody) [
+    FB-team-call-harvester [xcor] of food [ycor] of food 
+  ]
+end
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; enemy targeting and shooting
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+to Fb-team-base-try-select-ennemi-target-and-shoot
+  let r min-one-of perceive-robots ennemy [distance myself] 
+  set mem3 0
+  if ( r != nobody ) 
+  [
+   if ( not any? perceive-robots-in-cone color towards r) [ 
+    launch-faf r 
+    launch-rocket towardsxy [xcor] of r [ycor] of r
+    set mem3 1
+    ]
+  ]
+    
+end
+
+;;cherche une cible si on trouve une cible pas en etas chasse si onoreste a l'etas defaut 
+;; si on etais a l'etas chasse 
+to Fb-team-robot-try-select-ennemi-target 
+    let h min-one-of perceive-robots ennemy [ distance myself ]
+    ifelse ( h != nobody ) [
+    FB-team-set-target-t h
+        set mem1 replace-item 1 mem1 10 ;; mem1[1] = 10
+    ][
+        if ( item 1 mem1 = 10 )[ ;; si on etais en etas de tire 
+            set mem1 replace-item 1 mem1 0
+        ]
+    ]
+end
+
+;; si on est a l'etas a une cible a tiré tire 
+to Fb-Team-robot-try-shoot 
+    if( item 1 mem1 = 10) [
+    launch-faf  mem0
+    launch-rocket towardsxy [xcor] of mem0 [ycor] of mem0
+  ]
+    ;;[ launch-faf mem0 set mem5 0 ]
+end
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Enemy destroying plantations
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+to FB-Team-trampleOnPlantations
+  let s min-one-of perceive-seeds ennemy [distance myself]
+  ifelse (s != nobody) ;; S'il y a des plantations, les écraser
+  [
+    FB-team-move-towards-t s
+  ]
+  [
+    FB-team-wander-around-target 10 ;; Sinon bouger autour de la base adverse dans un rayon de 10
+  ]
+end
+
+;;;;;;;;;;;;;;;;;;; 
+;;   utile 
+;;;;;;;;;;;;;;;;;;;;;;;;;; 
+;;increment the value at index by increment 
+to-report FB-team-Increment-List [ inputlist index increment]
+  report replace-item index inputlist ((item index inputlist) + increment)
+end
+to-report FB-team-on-base [ b ]
+    report b != nobody and (distance b <= 2)
+end
+to-report FB-Team-maxEnergie 
+   if (breed = Harvesters)[
+       report harvester-nrj
+   ]
+   if (breed = RocketLaunchers)[
+       report rocket-launcher-nrj
+   ]
+   if (breed = Explorers)[
+       report explorer-nrj
+   ]
+end
+
+to-report FB-Team-Distance-To-Target-less-than [ x ]
+  report FB-Team-Distance-To-Target < x 
+end
+
+to-report FB-Team-On-target
+  report FB-Team-Distance-To-Target = 0
+end
+to-report FB-Team-Distance-To-Target
+  report distancexy item 0 mem0 item 1 mem0 
+end
+
+to-report FB-Team-Distance-To-Closest-Base 
+  report distance min-one-of my-bases [ distance myself ] 
+end
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;; energy handeler 
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+to FB-team-ask-for-energy [ b n ] ;; ask to base b to give myself n energy if it energy > 1000
+  ask b [ if (energy > 1000) [ give-energy myself n ]]
+end
+
+to-report FB-Team-Need-energy 
+  report energy < 1000
+end
+
+;;;;;;;;;
+;; state change handler 
+;;;;;;;;;
+;;set state to return base if need  
+to FB-Team-Handel-Return-Base-State 
+  if (FB-Team-Need-energy or (breed = RocketLaunchers and nb-missiles = 0) )[
+    set mem1 FB-Tem-Set-State 1 
+  ]
+end 
+to FB-Team-Handel-Return-To-Base-For-Deposing-Food
+  if( carrying-food? > 500 )
+  [ set mem1 FB-Tem-Set-State 1]
+end
+
+to FB-Team-Return-To-Basic-State-On-Target
+  if (Fb-team-on-State-ShouldGoxy and FB-Team-Distance-To-Target <= 2)
+  [  
+    set mem1 FB-Tem-Set-State 0 
+  ]
+end
+
+;;;;;;;;;;;;;;;;;;;;;;
+;;   Type Handling 
+;;;;;;;;;;;;;;;;;;;;;
+
+to-report FB-Team-getType
+  report item 0 mem1
+end
+
+;;;;;;;;;;;;;;;;;;;;;;
+;;   State Report 
+;;;;;;;;;;;;;;;;;;;;;
+;; mem1[1] > etas 
+;;  etat 0 => Etat basique (par défaut)
+;;  etat 1 => retour base  
+;;  etat 2 => doit aller en position x,y ( mem0 )
+;;;;;;;;;;;;;;;;;;;;;
+
+to-report FB-Team-on-State-BasicState
+  report item 1 mem1 = 0
+end
+
+to-report Fb-team-on-State-ShouldGoxy
+    report item 1 mem1 = 2 
+end
+
+to-report FB-Team-on-State-ShouldGoBase
+  report item 1 mem1 = 1
+end 
+
+to-report FB-Tem-Report-State
+  report item 1 mem1
+end
+;;;;;;;
+;; Stat Set 
+;;;;;;
+
+to-Report FB-Tem-Set-State [ state ]
+  report replace-item 1 mem1 state 
+end
+
+;;;;;;;;;;;;;;;;; main program ;;;;;;;;;;;;;;
+ 
+;;;; Restock ;;;;
+to FB-Team-Refiull-energie 
+    let b min-one-of my-bases [ distance myself ]
+    if (FB-team-on-base b )[
+        FB-team-ask-for-energy b FB-Team-maxEnergie - energy
+    ]
+end
+
+to FB-Ream-Restock-misiles [ n ] ;;n number of misilse 
+    new-missile n
+end
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;  -----------------------------------------------------------------------------------------------------------------------EXPLORERS------------------------------------------------------------------------------------------------------------------
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;  Explorers main program
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+to goRedExplorer
+  let b min-one-of my-bases [ distance myself ] ;; b closest base 
+  if( FB-team-on-base b ) [
+    FB-Team-Refiull-energie 
+  ]
+  FB-Team-Explorer-StateHandler b
+  FB-TEAM-Explorer-movement  
+  FB-team-drive-harvesters-on-peceive-food
+end
+
+to FB-Team-Explorer-StateHandler [b]
+  if (FB-Team-getType = 0) [
+    if (FB-team-on-base b and ( item 1 mem1 = 1 ) )[set mem1 FB-Tem-Set-State 0] ;;si on retournais a la base est qu'on est en contact c'est bo
+ ;; FB-Team-Handel-Return-Base-State  ;;  si pas d'energie ou pas de misile revien a la base 
+ ;; FB-Team-Handel-Return-To-Base-For-Deposing-Food ;; return to base if more thant 500 food cariing
+  ]
+  
+  if (FB-Team-getType = 2) [
+    FB-Team-Explorer-handleGoNextToBase
+    FB-Team-Explorer-handleWaitForCompanions
+    FB-Team-Explorer-handleGoToEnemyBase
+    FB-Team-Explorer-handleTrampleOnPlantation
+    FB-Team-Explorer-handleSuicideOnBase
+  ]
+end
+
+to FB-TEAM-Explorer-movement
+  if (FB-Team-getType = 0) [
+    if(FB-Team-on-State-ShouldGoBase) [FB-Team-go-back-to-my-Base]
+    if(Fb-team-on-State-ShouldGoxy) [Fb-Team-move-towards-target]
+    random-move
+  ]
+  
+  if (FB-Team-getType = 2) [
+    if (FB-Team-Explorer-onState-goNextToBase)        [Fb-Team-move-towards-target]
+    if (FB-Team-Explorer-onState-waitForCompanions)   [FB-Team-wander-around-xy (item 0 mem0) (item 1 mem0) 5]
+    if (FB-Team-Explorer-onState-goToEnemyBase)       [FB-team-move-towards-xy (xcor + 10) (item 1 mem0)] ;; Se déplce uniquement sur x, à hauteur de la base
+    if (FB-Team-Explorer-onState-trampleOnPlantation) [FB-Team-trampleOnPlantations]
+    if (FB-Team-Explorer-onState-suicideOnBase)       [FB-Team-suicideOnTarget]
+  ]
+end
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;  Explorers state change handlers
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+to FB-Team-Explorer-handleGoNextToBase
+  if (FB-Team-on-State-BasicState) [
+    FB-Team-Explorer-setState-goNextToBase
+  ]
+end
+
+to FB-Team-Explorer-handleWaitForCompanions
+  if (FB-Team-Explorer-onState-goNextToBase and 
+    (distancexy (item 0 mem0) (item 1 mem0)) < 5) [ ;; On passe à l'état suivant si on est dans un rayon de 5 du point d'attente
+    FB-Team-Explorer-setState-waitForCompanions
+  ]
+end
+
+to FB-Team-Explorer-handleGoToEnemyBase
+  if (FB-Team-Explorer-onState-waitForCompanions and
+    count (perceive-specific-robots color Explorers) with [(item 0 mem1) = 2] >= 10) [ ;; On passe à l'état suivant si il y a 10 companions au moins
+    FB-team-explorer-setState-goToEnemyBase
+  ]
+end
+
+to FB-Team-Explorer-handleTrampleOnPlantation
+  if (FB-Team-Explorer-onState-goToEnemyBase) [
+    let b min-one-of (perceive-base ennemy) [ distance myself ]
+    if (b != nobody) [ ;; On passe à l'état écrasement si on perçoit la plantation adverse
+      FB-team-set-target-xy ([xcor] of b) ([ycor] of b)
+      FB-team-explorer-setState-trampleOnPlantation
+    ]
+  ]
+end
+
+to FB-Team-Explorer-handleSuicideOnBase
+  ;; On passe à l'état suicide si notre énergie est inférieure à celle qui nous faudrait pour rejoindre la base adverse, avec une chance de nous tirer dessus de 25%
+  ;; et une sécurité de 0.5
+  if (FB-Team-Explorer-onState-trampleOnPlantation and
+    energy < (distancexy (item 0 mem0) (item 1 mem0)) * (explorer-metabolism + missile-robot-damage / 4) + 0.5) [
+    FB-team-explorer-setState-suicideOnBase
+  ]
+end
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;  Explorers state setters/reporters
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+to FB-Team-Explorer-setState-waitForCompanions
+  set mem1 replace-item 1 mem1 201 
+end
+
+to-report FB-Team-Explorer-onState-waitForCompanions
+  report item 1 mem1 = 201 
+end
+
+to FB-Team-Explorer-setState-goNextToBase
+  set mem1 replace-item 1 mem1 901 
+end
+
+to-report FB-Team-Explorer-onState-goNextToBase
+  report item 1 mem1 = 901 
+end
+
+to FB-Team-Explorer-setState-goToEnemyBase
+  set mem1 replace-item 1 mem1 902 
+end
+
+to-report FB-Team-Explorer-onState-goToEnemyBase
+  report item 1 mem1 = 902 
+end
+
+to FB-Team-Explorer-setState-trampleOnPlantation
+  set mem1 replace-item 1 mem1 903 
+end
+
+to-report FB-Team-Explorer-onState-trampleOnPlantation
+  report item 1 mem1 = 903
+end
+
+to FB-Team-Explorer-setState-suicideOnBase
+  set mem1 replace-item 1 mem1 904 
+end
+
+to-report FB-Team-Explorer-onState-suicideOnBase
+  report item 1 mem1 = 904
+end
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;  -----------------------------------------------------------------------------------------------------------------------HARVESTERS-----------------------------------------------------------------------------------------------------------------
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+to FB-Team-Harverster-StateHandler [b]
+  if (FB-team-on-base b and ( FB-Team-on-State-ShouldGoBase ) )
+  [
+    set mem1 FB-Tem-Set-State 0
+  ] ;;si on retournais a la base est qu'on est en contact c'est bo
+  FB-Team-Handel-Return-Base-State ;; return to base if nedd energy
+  FB-Team-Handel-Return-To-Base-For-Deposing-Food ;; return to base if more thant 500 food cariing 
+  FB-Team-Return-To-Basic-State-On-Target
+end
+
+to FB-TEAM-Harvester-movement
+  if(FB-Team-on-State-ShouldGoBase)[FB-Team-go-back-to-my-Base]
+  if(Fb-team-on-State-ShouldGoxy) [ Fb-Team-move-towards-target ]
+  FB-Team-Handel-Return-To-Base-For-Deposing-Food
+  FB-team-harversers-go-on-food-if-detected
+  random-move
+end
+
+to FB-Team-Harvester-Handel-Food
+  let b min-one-of my-bases [ distance myself ] 
+  if( carrying-food? > 0 and distance b < 10 )[
+    ifelse(distance b <= 2) 
+    [
+      give-food b carrying-food?
+    ]
+    [
+      if ( carrying-food? > 100 )[ plant-seeds color max-seeds]
+    ] 
+    
+  ]
+end
+to goRedHarvester
+  let b min-one-of my-bases [ distance myself ] ;; b closest base 
+  if( FB-team-on-base b ) [
+    FB-Team-Refiull-energie 
+  ]
+  FB-Team-Harverster-StateHandler b
+  FB-TEAM-Harvester-movement
+  FB-Team-Harvester-Handel-Food  
+end
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;  -----------------------------------------------------------------------------------------------------------------------ROCKET LAUNCHER------------------------------------------------------------------------------------------------------------
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+to FB-Team-RocketLauncher-State-Handler [ b ] ;;  b closest base 
+  if (FB-team-on-base b and ( item 1 mem1 = 1 ) )[set mem1 FB-Tem-Set-State 0] ;;si on retournais a la base est qu'on est en contact c'est bo
+  FB-Team-Handel-Return-Base-State  ;;  si pas d'energie ou pas de misile revien a la base 
+end
+
+to FB-TEAM-Roketlauncher-movement
+  if(FB-Team-on-State-ShouldGoBase)[FB-Team-go-back-to-my-Base]
+  if(Fb-team-on-State-ShouldGoxy) [ Fb-Team-move-towards-target ]
+  random-move
+end
+
+to goRedRocketLauncher
+  let b min-one-of my-bases [ distance myself ] ;; b closest base 
+  if( FB-team-on-base b ) [
+    FB-Team-Refiull-energie
+    if(nb-missiles = 0 )
+    [
+      FB-Ream-Restock-misiles 5 ;;; todo calculer le nombre de misilses a restock 
+    ]
+  ]
+  
+  FB-Team-RocketLauncher-State-Handler b ;; change the state if neeeded 
+  FB-TEAM-Roketlauncher-movement   
+  
+  Fb-team-robot-try-select-ennemi-target
+  Fb-Team-robot-try-shoot 
+  
+  
+end
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;  -----------------------------------------------------------------------------------------------------------------------BASE-----------------------------------------------------------------------------------------------------------------------
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;  Creation functions
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+to FB-Team-Base-incrementCreationList [ index t num ]
+  let creationList (item index mem1)
+  set creationList replace-item t creationList ((item t creationList) + num) 
+  set mem1 replace-item index mem1 creationList
+end
+
+to FB-Team-Base-incrementCreatedList [ index t num ]
+  let createdList (item index mem1)
+  set createdList replace-item t createdList ((item t createdList) + num) 
+  set mem1 replace-item index mem1 createdList
+end
+
+;; Creates an explorer of type t
+to FB-Team-createExplorerNow [ t ]
+  FB-Team-Base-incrementCreationList 1 t -1
+  FB-Team-Base-setTypeOfNewRobot t
+  new-Explorer self
+  FB-Team-Base-incrementCreatedList 5 t 1
+end
+
+;; Creates an harvester of type t
+to FB-Team-createHarvesterNow [ t ]
+  FB-Team-Base-incrementCreationList 2 t -1
+  FB-Team-Base-setTypeOfNewRobot t
+  new-Harvester self
+  FB-Team-Base-incrementCreatedList 6 t 1
+end
+
+;; Creates a rocket launcher of type t
+to FB-Team-createRocketLauncherNow [ t ]
+  FB-Team-Base-incrementCreationList 3 t -1
+  FB-Team-Base-setTypeOfNewRobot t
+  new-RocketLauncher self
+  FB-Team-Base-incrementCreatedList 7 t 1
+end
+
+;; creat robot if should creat it ( mem1 : )
+to Fb-Team-Base-new-robot-if-should
+  let i 0
+  
+  let explorersCreationList (item 1 mem1)
+  set i 0
+  foreach explorersCreationList [ ex ->
+    if (ex > 0) [ 
+      FB-Team-createExplorerNow i
+      stop
+    ]
+    set i (i + 1)
+  ]
+  
+  let harvestersCreationList (item 2 mem1)
+  set i 0
+  foreach harvestersCreationList [ ha ->
+    if (ha > 0) [ 
+      FB-Team-createHarvesterNow i
+      stop
+    ]
+    set i (i + 1)
+  ]
+  
+  let rocketLaunchersCreationList (item 3 mem1)
+  set i 0
+  foreach rocketLaunchersCreationList [ rl ->
+    if (rl > 0) [ 
+      FB-Team-createRocketLauncherNow i
+      stop
+    ]
+    set i (i + 1)
+  ]
+end
+
+;; Ask base to create num Explorers of type t when possible
+to FB-Team-Base-createExplorersWhenPossible [ t num ]
+  FB-Team-Base-incrementCreationList 1 t num
+end
+
+;; Ask base to create num Harvesters of type t when possible
+to FB-Team-Base-createHarvestersWhenPossible [ t num ]
+  FB-Team-Base-incrementCreationList 2 t num
+end
+
+;; Ask base to create num RocketLaunchers of type t when possible
+to FB-Team-Base-createRocketLaunchersWhenPossible [ t num ]
+  FB-Team-Base-incrementCreationList 3 t num
+end
+
+to FB-Team-Base-increment-tick
+  set mem1 FB-team-Increment-List mem1 0 1
+end
+
+to-report FB-Team-Base-Tick
+  report item 0 mem1
+end
+
+;; Set the type of the next created robot
+to FB-Team-Base-setTypeOfNewRobot [ t ]
+  set mem1 replace-item 8 mem1 t 
+end
+
+;; Get the type of the newly created robot
+to-report FB-Team-Base-getTypeOfNewRobot
+  report item 8 mem1
+end
+
+;;;mem1 : [
+;;; 0 : nombre de tick passé depuis t0
+;;  1 : nombre d’explorer crée,
+;;  2 : nombre d’harverster crée 
+;;  3 : nombre d’roketluncher crée 
+;;  ]
+;;FB-team-Increment-List [ inputlist index increment]
+to goRedBase
+  FB-Team-Base-increment-tick   
+  Fb-Team-Base-new-robot-if-should  
+  Fb-team-base-try-select-ennemi-target-and-shoot
+  FB-team-drive-harvesters-on-peceive-food
+  ;;new-missile 1
+  ;;new-faf 1
+end  
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;, INIT 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+to FB-Team-Init-Memory 
+  set mem0 [0 0]
+  set mem1 [0 0]
+  set mem2 [0 0]
+end
+
+to FB-Team-Init-Type
+  set mem1 replace-item 0 mem1 ([FB-Team-Base-getTypeOfNewRobot] of min-one-of my-bases [distance myself])
+end
+
+;; procedure pour initialiser les explorers
+to initRedExplorer
+  FB-Team-Init-Memory
+  FB-Team-Init-Type
+end
+
+;; procedure pour initialiser les rocket-launchers
+to initRedRocketLauncher
+  FB-Team-Init-Memory
+  FB-Team-Init-Type
+end
+
+;; procedure pour initialiser les harvesters
+to initRedHarvester
+  FB-Team-Init-Memory
+  FB-Team-Init-Type
+end
+
+;; procedure pour initialiser les bases verts
+;;;mem1 : [
+;; 0 : nombre de tick passé depuis t0
+;; 1 : nombre d’explorer a crée,
+;; 2 : nombre d’harverster a crée 
+;; 3 : nombre d’roketluncher a crée
+;; 5 : nombre d’explorer  crée,
+;; 6 : nombre d’harverster  crée 
+;; 7 : nombre d’roketluncher  crée
+;; 8 : type du prochain robot à créer
+;;  ]
+to initRedBase
+  set mem1 [0 [0 0 0] [0] [0] 0 [0 0 0] [0] [0] 0] ;; 7 
+  set mem1 FB-team-Increment-List mem1 0 1 ;; intit tick
+  FB-Team-Base-createExplorersWhenPossible 0 5 ;;créer 5 explorer de type 0
+  FB-Team-Base-createExplorersWhenPossible 2 10 ;;créer 10 explorer de type 2
+  FB-Team-Base-createHarvestersWhenPossible 0 5 ;;créer 5 harverster de type 0
+  FB-Team-Base-createRocketLaunchersWhenPossible 0 5 ;;créer 5 roketluncher de type 0
 end
