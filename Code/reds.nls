@@ -32,17 +32,10 @@ to initRedBase
 end
 
 to goRedBase
-  ifelse (mem2 < 10)
+  if (mem2 < 10)
   [
     FB-team-base-createExplorerOfType 2
     set mem2 (mem2 + 1)
-  ]
-  [
-    if (mem2 = 10)
-    [
-      FB-team-base-createExplorerOfType 3
-      set mem2 (mem2 + 1)
-    ]
   ]
 end
 
@@ -84,34 +77,34 @@ to initRedExplorer
   let b min-one-of my-bases [ distance myself ]
   FB-team-init-type-and-state ([FB-team-getTypeOfNewRobot] of b) 0
   
-  if (FB-team-getType = 2) ;; Type explorer attaquant/soldat
+  if (FB-team-getType = 2) ;; Type explorer attaquant/groupe
   [
     FB-team-initExplorer2
   ]
   
-  if (FB-team-getType = 3) ;; Type explorer attaquant/chef
+  if (FB-team-getType = 3) ;; Type explorer attaquant/soldat
   [
     FB-team-initExplorer3
   ]
   
-  if (FB-team-getType = 4) ;; Type explorer attaquant/groupe
+  if (FB-team-getType = 4) ;; Type explorer attaquant/chef
   [
     FB-team-initExplorer4
   ]
 end
 
 to goRedExplorer
-  if (FB-team-getType = 2) ;; Type explorer attaquant/soldat
+  if (FB-team-getType = 2) ;; Type explorer attaquant/groupe
   [
     FB-team-goExplorer2
   ]
   
-  if (FB-team-getType = 3) ;; Type explorer attaquant/chef
+  if (FB-team-getType = 3) ;; Type explorer attaquant/soldat
   [
     FB-team-goExplorer3
   ]
   
-  if (FB-team-getType = 4) ;; Type explorer attaquant/groupe
+  if (FB-team-getType = 4) ;; Type explorer attaquant/chef
   [
     FB-team-goExplorer4
   ]
@@ -201,7 +194,7 @@ end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;;  --------------------------------------------Explorer type 2 (Attaquant/Soldat)-----------------------------------------
+;;  --------------------------------------------Explorer type 2 (Attaquant/Groupe)-----------------------------------------
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -212,6 +205,91 @@ to FB-team-initExplorer2
 end
 
 to FB-team-goExplorer2
+  if (FB-team-explorer-onState-goNextToBase) 
+  [
+    FB-team-explorer-state-goNextToBase
+    if ((distancexy (item 0 mem0) (item 1 mem0)) < 5) ;; On passe à l'état suivant si on est dans un rayon de 6 du point d'attente
+    [
+      FB-team-explorer-setState-waitForCompanions
+    ]
+  ]
+  
+  if (FB-team-explorer-onState-waitForCompanions) 
+  [
+    FB-team-explorer-state-waitForCompanions
+    if (count (perceive-specific-robots color Explorers) with [(item 0 mem1) = 2] >= 10) ;; On passe à l'état suivant si il y a 10 companions au moins
+    [
+      FB-team-explorer-setState-goToEnemyBase
+    ]
+  ]
+  
+  if (FB-team-explorer-onState-goToEnemyBase)
+  [
+    FB-team-explorer-state-goToEnemyBase
+    let b min-one-of (perceive-base ennemy) [ distance myself ]
+    if (b != nobody) ;; On passe à l'état suivant si on perçoit la plantation
+    [
+      FB-team-set-target-t b
+      FB-team-explorer-setState-trampleOnPlantation
+    ]
+  ]
+  
+  if (FB-team-explorer-onState-trampleOnPlantation)
+  [
+    FB-team-explorer-state-trampleOnPlantation
+    ;; On passe à l'état suivant si notre énergie est inférieure à celle qui nous faudrait pour rejoindre la base adverse, avec une chance de nous tirer dessus de 25%
+    ;; et une sécurité de 0.5
+    if (energy < (distancexy (item 0 mem0) (item 1 mem0)) * (explorer-metabolism + missile-robot-damage / 4) + 0.5)
+    [
+      FB-team-explorer-setState-suicideOnBase
+    ]
+  ]
+  
+  if (FB-team-explorer-onState-suicideOnBase)
+  [
+    FB-team-explorer-state-suicideOnBase
+  ]
+end
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;  Etats d'Explorer 2
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Attend ses companions
+;; PREREQUIS : coordonnées du point d'attente dans mem0
+to FB-team-explorer-state-waitForCompanions
+  FB-team-wander-around-xy (item 0 mem0) (item 1 mem0) 5
+end
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;  Fonctions de report d'états pour Explorer 2
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+to FB-team-explorer-setState-waitForCompanions
+  set mem1 replace-item 1 mem1 201 
+end
+
+to-report FB-team-explorer-onState-waitForCompanions
+  report item 1 mem1 = 201 
+end
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;  --------------------------------------------Explorer type 3 (Attaquant/Soldat)-----------------------------------------
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+to FB-team-initExplorer3
+  let b min-one-of my-bases [ distance myself ]
+  set mem0 [item 0 mem0] of b
+  FB-team-explorer-setState-goNextToBase
+end
+
+to FB-team-goExplorer3
   if (FB-team-explorer-onState-goNextToBase) 
   [
     FB-team-explorer-state-goNextToBase
@@ -249,7 +327,7 @@ end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;;  Etats d'Explorer 2
+;;  Etats d'Explorer 3
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -271,24 +349,24 @@ end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;;  Fonctions de report d'états pour Explorer 2
+;;  Fonctions de report d'états pour Explorer 3
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 to FB-team-explorer-setState-waitForChief
-  set mem1 replace-item 1 mem1 201 
+  set mem1 replace-item 1 mem1 301 
 end
 
 to-report FB-team-explorer-onState-waitForChief
-  report item 1 mem1 = 201 
+  report item 1 mem1 = 301 
 end
 
 to FB-team-explorer-setState-followChief
-  set mem1 replace-item 1 mem1 202 
+  set mem1 replace-item 1 mem1 302 
 end
 
 to-report FB-team-explorer-onState-followChief
-  report item 1 mem1 = 202 
+  report item 1 mem1 = 302 
 end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -299,7 +377,7 @@ end
 
 ;; Renvoie le chef le plus proche
 to-report FB-team-explorer-perceiveChief
-  let exs (perceive-specific-robots color Explorers) with [(item 0 mem1) = 3] ;; Perceive Explorers of type 3
+  let exs (perceive-specific-robots color Explorers) with [(item 0 mem1) = 4] ;; Perceive Explorers of type 3
   report min-one-of exs [distance myself]
 end
 
@@ -315,17 +393,17 @@ end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;;  --------------------------------------------Explorer type 3 (Attaquant/Chef)-------------------------------------------
+;;  --------------------------------------------Explorer type 4 (Attaquant/Chef)-------------------------------------------
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-to FB-team-initExplorer3
+to FB-team-initExplorer4
   let b min-one-of my-bases [ distance myself ]
   set mem0 [item 0 mem0] of b
   FB-team-explorer-setState-goNextToBase
 end
 
-to FB-team-goExplorer3
+to FB-team-goExplorer4
   if (FB-team-explorer-onState-goNextToBase) 
   [
     FB-team-explorer-state-goNextToBase
@@ -371,7 +449,7 @@ end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;;  Etats d'Explorer 3
+;;  Etats d'Explorer 4
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -383,100 +461,15 @@ end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;;  Fonctions de report d'états pour Explorer 3
-;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-to FB-team-explorer-setState-informSoldiersOfArrival
-  set mem1 replace-item 1 mem1 301 
-end
-
-to-report FB-team-explorer-onState-informSoldiersOfArrival
-  report item 1 mem1 = 301 
-end
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;;  --------------------------------------------Explorer type 4 (Attaquant/Groupe)-----------------------------------------
-;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-to FB-team-initExplorer4
-  let b min-one-of my-bases [ distance myself ]
-  set mem0 [item 0 mem0] of b
-  FB-team-explorer-setState-goNextToBase
-end
-
-to FB-team-goExplorer4
-  if (FB-team-explorer-onState-goNextToBase) 
-  [
-    FB-team-explorer-state-goNextToBase
-    if ((distancexy (item 0 mem0) (item 1 mem0)) < 6) ;; On passe à l'état suivant si on est dans un rayon de 6 du point d'attente
-    [
-      FB-team-explorer-setState-waitForCompanions
-    ]
-  ]
-  
-  if (FB-team-explorer-onState-waitForCompanions) 
-  [
-    FB-team-explorer-state-waitForCompanions
-    if (count (perceive-specific-robots color Explorers) with [(item 0 mem1) = 4] >= 10) ;; On passe à l'état suivant si il y a 10 companions au moins
-    [
-      FB-team-explorer-setState-goToEnemyBase
-    ]
-  ]
-  
-  if (FB-team-explorer-onState-goToEnemyBase)
-  [
-    FB-team-explorer-state-goToEnemyBase
-    let b min-one-of (perceive-base ennemy) [ distance myself ]
-    if (b != nobody) ;; On passe à l'état suivant si on perçoit la plantation
-    [
-      FB-team-set-target-t b
-      FB-team-explorer-setState-trampleOnPlantation
-    ]
-  ]
-  
-  if (FB-team-explorer-onState-trampleOnPlantation)
-  [
-    FB-team-explorer-state-trampleOnPlantation
-    ;; On passe à l'état suivant si notre énergie est inférieure à celle qui nous faudrait pour rejoindre la base adverse, avec une chance de nous tirer dessus de 25%
-    ;; et une sécurité de 0.5
-    if (energy < (distancexy (item 0 mem0) (item 1 mem0)) * (explorer-metabolism + missile-robot-damage / 4) + 0.5)
-    [
-      FB-team-explorer-setState-suicideOnBase
-    ]
-  ]
-  
-  if (FB-team-explorer-onState-suicideOnBase)
-  [
-    FB-team-explorer-state-suicideOnBase
-  ]
-end
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;;  Etats d'Explorer 4
-;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;; Attend ses companions
-;; PREREQUIS : coordonnées du point d'attente dans mem0
-to FB-team-explorer-state-waitForCompanions
-  FB-team-wander-around-xy (item 0 mem0) (item 1 mem0) 6
-end
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
 ;;  Fonctions de report d'états pour Explorer 4
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-to FB-team-explorer-setState-waitForCompanions
+to FB-team-explorer-setState-informSoldiersOfArrival
   set mem1 replace-item 1 mem1 401 
 end
 
-to-report FB-team-explorer-onState-waitForCompanions
+to-report FB-team-explorer-onState-informSoldiersOfArrival
   report item 1 mem1 = 401 
 end
 
