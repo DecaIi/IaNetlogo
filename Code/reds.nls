@@ -76,9 +76,9 @@ to FB-Team-move-forward
 end
 
 ;; handel harverster grabing food on an area 
-to FB-team-harversers-go-on-food-or-random-move 
+to FB-team-harversers-go-on-food-if-detected 
     let f min-one-of perceive-food [ distance myself]
-    ifelse (f != nobody) 
+    if (f != nobody) 
     [  ;; si j'ai persu de la nouriture 
     ifelse (distance f) <= 2 ;; si la nouriture est plus proche que 2 unité ( je peut la prendre )
       [ take-food f ] ;; je la prend 
@@ -87,10 +87,8 @@ to FB-team-harversers-go-on-food-or-random-move
         set heading towards f
         Fb-Team-move-forward 
       ]
-      ]
-    [
-        random-move
     ]
+
 end
 ;; handel wall taking 
 to Fb-team-harverser-go-take-wall 
@@ -217,6 +215,22 @@ to-report FB-Team-maxEnergie
    ]
 end
 
+to-report FB-Team-Distance-To-Target-less-than [ x ]
+  report FB-Team-Distance-To-Target < x 
+end
+
+to-report FB-Team-On-target
+  report FB-Team-Distance-To-Target = 0
+end
+to-report FB-Team-Distance-To-Target
+  report distancexy item 0 mem0 item 1 mem0 
+end
+
+to-report FB-Team-Distance-To-Closest-Base 
+  report distance min-one-of my-bases [ distance myself ] 
+end
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;; energy handeler 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -234,10 +248,15 @@ end
 ;;;;;;;;;
 ;;set state to return base if need  
 to FB-Team-Handel-Return-Base-State 
-  if (energy < 1000 or (breed = RocketLaunchers and nb-missiles = 0) )[
+  if (FB-Team-Need-energy or (breed = RocketLaunchers and nb-missiles = 0) )[
     set mem1 FB-Tem-Set-State 1 
   ]
 end 
+to FB-Team-Handel-Return-To-Base-For-Deposing-Food
+  if( carrying-food? > 500 )
+  [ set mem1 FB-Tem-Set-State 1]
+end
+
 
 ;;;;;;;;;;;;;;;;;;;;;;
 ;;   State Report 
@@ -296,17 +315,44 @@ to goRedExplorer
   ;;todo 
 end
 
+
+
 ;;;;;;;;;;;;;; harvester ;;;;;;;;;;;
 to FB-Team-Harverster-StateHandler [b]
-  ;;todo
+   if (FB-team-on-base b and ( FB-Team-on-State-ShouldGoBase ) )[set mem1 FB-Tem-Set-State 0] ;;si on retournais a la base est qu'on est en contact c'est bo
+   FB-Team-Handel-Return-Base-State ;; return to base if nedd energy
+   FB-Team-Handel-Return-To-Base-For-Deposing-Food ;; return to base if more thant 500 food cariing 
 end
 
 to FB-TEAM-Harvester-movement
-  ;;todo
+  if(FB-Team-on-State-ShouldGoBase)[FB-Team-go-back-to-my-Base]
+  if(Fb-team-on-State-ShouldGoxy) [ Fb-Team-move-towards-target ]
+  FB-Team-Handel-Return-To-Base-For-Deposing-Food
+  FB-team-harversers-go-on-food-if-detected
+  random-move
 end
 
+to FB-Team-Harvester-Handel-Food
+  let b min-one-of my-bases [ distance myself ] 
+  if( carrying-food? > 0 and distance b < 10 )[
+    ifelse(distance b <= 2) 
+    [
+      give-food b carrying-food?
+    ]
+    [
+      if ( carrying-food? > 100 )[ plant-seeds color max-seeds]
+    ] 
+    
+  ]
+end
 to goRedHarvester
-  ;;todo 
+  let b min-one-of my-bases [ distance myself ] ;; b closest base 
+  if( FB-team-on-base b ) [
+    FB-Team-Refiull-energie 
+  ]
+  FB-Team-Harverster-StateHandler b
+  FB-TEAM-Harvester-movement
+  FB-Team-Harvester-Handel-Food  
 end
 
 ;;;;;;;;;;;Roket luncher ;;;;;;;;;
@@ -438,6 +484,6 @@ to initRedBase
   set mem1 [0 0 0 0 0 0 0 0] ;; 7 
   set mem1 FB-team-Increment-List mem1 0 1 ;; intit tick
   set mem1 FB-team-Increment-List mem1 1 0 ;;créer 5 explorer
-  set mem1 FB-team-Increment-List mem1 2 0 ;;créer 5 harverster
-  set mem1 FB-team-Increment-List mem1 3 5 ;;créer 5 roketluncher
+  set mem1 FB-team-Increment-List mem1 2 5 ;;créer 5 harverster
+  set mem1 FB-team-Increment-List mem1 3 0 ;;créer 5 roketluncher
 end
