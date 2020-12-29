@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; le code de l'equipe verte basique
-;; préfixe : grenn-team
+;; préfixe : FB-team
 ;;
 ;; mem0 et mem1 : coordonnees d'une cible
 ;; mem5 : indique si le robot a ou non une cible sélectionnée
@@ -11,14 +11,14 @@
 ;; mem8 : le nb d'explorers à créer
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-to grenn-team-ask-for-energy [ b n ] ;; ask to base b to give myself n energy if it energy > 1000
+to FB-team-ask-for-energy [ b n ] ;; ask to base b to give myself n energy if it energy > 1000
   ask b [ if (energy > 1000) [ give-energy myself n ]]
 end
 
 ;;
 ;; rentre à la base et si le robot transporte plus de 1000 unités de nourriture ou si son énergie est inférieure à 500 ou si c'est un rocket-launcher qui n'a plus de missiles
 ;;
-to grenn-team-go-back-to-base
+to FB-team-go-back-to-base
   ;; détermine la base la plus proche
   let b min-one-of my-bases [ distance myself ]
   if (b != nobody) [ ;; il ya aux une base la plus proce 
@@ -29,11 +29,11 @@ to grenn-team-go-back-to-base
         ;; dépose sa nourriture
         give-food b carrying-food?
         ;; demande de l'énergie si il reste moins de 1000
-        if (energy < 1000) [ grenn-team-ask-for-energy b 300 ]
+        if (energy < 1000) [ FB-team-ask-for-energy b 300 ]
         ;; demande de l'énergie pour créer 5 missiles
         if ((Breed = RocketLaunchers) and (nb-missiles = 0)) 
           [
-            grenn-team-ask-for-energy b 500
+            FB-team-ask-for-energy b 500
             new-missile 5
           ]
         set mem4 0
@@ -57,14 +57,12 @@ to grenn-team-go-back-to-base
     ]    
 end
 ;; si t'est un rocketLuncher ou un explorer tu bouge aux pif 
-to grenn-team-go-and-eat
+to FB-team-go-and-eat
   if ((breed = RocketLaunchers and (mem5 = 0)) or (breed = Explorers)) 
-   [random-move] ;; mvt aleatoir
-  ;;[grenn-team-random-move -20 20 ]
+    [random-move] ;; mvt aleatoir 
 end
 
-
-to grenn-team-harvesters-go-and-eat
+to FB-team-harvesters-go-and-eat
   let w min-one-of (perceive-walls) [distance myself] ;; si je persoit un mure stock sa distance 
   let b min-one-of my-bases [ distance myself ] ;; b = distance a la base 
   if ((w != nobody) and ((distance b < 10) or (distance b > 11))) [take-wall w] ;; si je suis pas a 10 de distance de la base prend le mure 
@@ -102,51 +100,51 @@ end
 ;; - 0 si le robot n'a pas de cible sélectionnée
 ;; - 1 si le robot a une cible sélectionnée
 ;;
-to-report grenn-team-no-target?
+to-report FB-team-no-target?
   report mem5 = 0
 end
 ;; save la position de la target dans meme0 meme 1 et met mem5 a 1
-to grenn-team-set-target-xy [ x y espece ]
+to FB-team-set-target-xy [ x y espece ]
   set mem0 x set mem1 y set mem2 espece set mem5 1
 end
 
 ;; save la position de la target dans meme0 meme 1 et met mem5 a 2
-to grenn-team-set-target-t [ t espece ]
+to FB-team-set-target-t [ t espece ]
   set mem0 t set mem2 espece set mem5 2
 end
 ;; di
-to grenn-team-set-food-target [ x y ]
-  if (grenn-team-no-target?) [ set mem0 x set mem1 y set mem5 1 ] 
+to FB-team-set-food-target [ x y ]
+  if (FB-team-no-target?) [ set mem0 x set mem1 y set mem5 1 ] 
 end
 ;;envoi un roket luncher en x,y
-to grenn-team-call-rocket-launcher-xy [ x y espece ]
+to FB-team-call-rocket-launcher-xy [ x y espece ]
   let rl min-one-of perceive-specific-robots color RocketLaunchers [ distancexy x y ]
-  if (rl != nobody) [ ask rl [ grenn-team-set-target-xy x y espece ]]
+  if (rl != nobody) [ ask rl [ FB-team-set-target-xy x y espece ]]
 end
 ;;envoi un roket luncher en t ?
-to grenn-team-call-rocket-launcher-t [ t espece ]
+to FB-team-call-rocket-launcher-t [ t espece ]
   let rl min-one-of perceive-specific-robots color RocketLaunchers [ distance t ]
-  if (rl != nobody) [ ask rl [ grenn-team-set-target-t t espece ]]
+  if (rl != nobody) [ ask rl [ FB-team-set-target-t t espece ]]
 end
 ;;envoi un explorer en x,y
-to grenn-team-call-explorer [ x y espece ]
+to FB-team-call-explorer [ x y espece ]
   let ex one-of perceive-specific-robots color Explorers
   if (ex != nobody) [
-    ask ex [ grenn-team-set-target-xy x y espece ]
+    ask ex [ FB-team-set-target-xy x y espece ]
   ]
 end
 ;;envoi un explorer en x,y
-to grenn-team-call-harvester [ x y ]
+to FB-team-call-harvester [ x y ]
   let h min-one-of perceive-specific-robots color harvesters [ distancexy x y ]
-  if (h != nobody) [ ask h [ grenn-team-set-food-target x y ]]
+  if (h != nobody) [ ask h [ FB-team-set-food-target x y ]]
 end
 
 ;;
 ;; essaye de sélectionner une cible à viser
 ;;
-to grenn-team-select-target
+to FB-team-select-target
   ;; si le robot n'a pas une base adverse comme cible
-  if (grenn-team-no-target?)
+  if (FB-team-no-target?)
   [
     ;; il essaye de percevoir un robot ennemi (le plus proche de lui)
     let h min-one-of perceive-robots ennemy [ distance myself ]
@@ -161,8 +159,8 @@ to grenn-team-select-target
   ]
 end
 ;; protocol de tir 
-to grenn-team-shoot 
-  if (not grenn-team-no-target?)
+to FB-team-shoot 
+  if (not FB-team-no-target?)
   [
     ifelse (mem5 = 1)
     [ launch-rocket towardsxy mem0 mem1 set mem5 0 ]
@@ -171,57 +169,57 @@ to grenn-team-shoot
   
 end
 ;; dirige un harvesters jusque de la nourture persu
-to grenn-team-drive-harvesters
+to FB-team-drive-harvesters
   let food one-of perceive-food
   if (food != nobody) [
-    grenn-team-call-harvester [xcor] of food [ycor] of food 
+    FB-team-call-harvester [xcor] of food [ycor] of food 
   ]
 end
 ;;; fonctionement des explorer 
 ;;; si ta pas d'energie tu rentre a la base 
 ;;; si ta de l'energie tu bouge aleatoirement et tu donne aux harverster une food par tour que tu trouve 
-to goGreenExplorer
+to goRedExplorer
 ;  ifelse (carrying-food? > 1000) or (energy < 500) or ((Breed = RocketLaunchers) and (nb-missiles = 0))
-  ifelse (energy < 1000 )
-  [ grenn-team-go-back-to-base ] ;; rentre a la base 
-  [ grenn-team-go-and-eat ]      ;; mvm random ( ameliorable en donnant une direction)
+  ifelse (energy < 1000)
+  [ FB-team-go-back-to-base ] ;; rentre a la base 
+  [ FB-team-go-and-eat ]      ;; mvm random ( ameliorable en donnant une direction)
   
-  grenn-team-drive-harvesters    ;; si je persoit de la nouriture je la donne a un harverster comme cible 
+  FB-team-drive-harvesters    ;; si je persoit de la nouriture je la donne a un harverster comme cible 
   ;; ( ici peut etre ameliorirer psq si le harverster est occuper l'info ce perde ) 
 
-  ifelse (not grenn-team-no-target?) 
+  ifelse (not FB-team-no-target?) 
   [
-    grenn-team-call-rocket-launcher-xy mem0 mem1 mem2
-    grenn-team-call-explorer mem0 mem1 mem2
+    FB-team-call-rocket-launcher-xy mem0 mem1 mem2
+    FB-team-call-explorer mem0 mem1 mem2
   ]
   [ 
     let h one-of perceive-robots ennemy
-    if ( h != nobody ) [ grenn-team-call-rocket-launcher-t h [breed] of h]
+    if ( h != nobody ) [ FB-team-call-rocket-launcher-t h [breed] of h]
   ]
 end
 
-to goGreenRocketLauncher
+to goRedRocketLauncher
 ;  ifelse (carrying-food? > 1000) or (energy < 500) or ((Breed = RocketLaunchers) and (nb-missiles = 0))
   ifelse (energy < 1000) or (nb-missiles = 0)
   [
     ;; rentre à la base si certaines conditions sont vérifiées
-    grenn-team-go-back-to-base
+    FB-team-go-back-to-base
   ]
   [
     ;; sinon sélectionne une cible
-    grenn-team-select-target
-    ifelse (grenn-team-no-target?)
+    FB-team-select-target
+    ifelse (FB-team-no-target?)
     ;; si pas de cible, cherche à manger
-    [ grenn-team-go-and-eat ]
+    [ FB-team-go-and-eat ]
     ;; sinon tire
-    [ grenn-team-shoot ]
+    [ FB-team-shoot ]
   ]
   
   ;; crée un nouveau missile si plus de 3000 unités d'énergie
   if ((energy > 3000) and (nb-missiles < 5)) [ new-missile 1 ]
 end
 
-to goGreenHarvester
+to goRedHarvester
   let f min-one-of perceive-food [ distance myself ]
   while [(f != nobody) and (distance f <= 2)] [
     take-food f
@@ -233,7 +231,7 @@ to goGreenHarvester
     ; retour à la base
     set mem4 1
     ;; rentre à la base si certaines conditions sont vérifiées
-    grenn-team-go-back-to-base
+    FB-team-go-back-to-base
     if (energy > 100) and (carrying-food? > 100) [ 
       ;; détermine la distance de la base la plus proche
       let b min-one-of my-bases [ distance myself ]
@@ -246,11 +244,11 @@ to goGreenHarvester
   ]
   [
     ;; cherche à manger
-    grenn-team-harvesters-go-and-eat
+    FB-team-harvesters-go-and-eat
   ]
 end
 
-to goGreenBase
+to goRedBase
   ;; crée un nouveau robot si il reste des demandes de création dans le pipe (mem6, mem7 ou mem8)
   ifelse (mem6 > 0) [ new-Harvester self set mem6 mem6 - 1 ]
   [ ifelse (mem7 > 0) [ new-RocketLauncher self set mem7 mem7 - 1 ]
@@ -261,47 +259,28 @@ to goGreenBase
   if (energy > 12000) [ ifelse (random 2 = 0) [ set mem6 mem6 + 1 ][ifelse (random 2 = 0) [ set mem7 mem7 + 1 ][ set mem8 mem8 + 1 ]]]
 
   ;;let t one-of perceive-specific-robots ennemy rocketlaunchers
-  let t one-of perceive-robots ennemy ;; tire sur tout ce qui approche pas que les rokets luncher 
+  let t one-of perceive-robot ennemy ;; tire sur tout ce qui approche pas que les rokets luncher 
   if (t != nobody) [
     ;; regarde s'il y a des robots amis en direction de la cible potentielle t avant de tirer
     if (not any? perceive-robots-in-cone color towards t) [ launch-faf t ]
-   grenn-team-drive-harvesters  ;; si je persoi de la nouriture je la donne aux harverser comme cible 
-  
   ]
 end
 
 ;; procedure pour initialiser les explorers verts
-to initGreenExplorer
-  
+to initRedExplorer
 end
 
 ;; procedure pour initialiser les rocket-launchers verts
-to initGreenRocketLauncher
+to initRedRocketLauncher
 end
 
 ;; procedure pour initialiser les harvesters verts
-to initGreenHarvester
+to initRedHarvester
 end
 
 ;; procedure pour initialiser les bases verts
-to initGreenBase
+to initRedBase
   ; crée des explorers, des harvesters et des rocket-launchers
   new-Harvester self
   set mem6 7    ;; comme on ne peut créer qu'un seul robot par tour, mem6 sert à savoir combien de harvesters on doit encore créer
 end
-
-
-;;; function we add to the file 
-
-to grenn-team-random-move[ minangle  maxangle ] 
-  ; choisit une orientation aleatoire entre -45 et +45 degres
-  let truemaxangle  maxangle - minangle
-  rt random truemaxangle - minangle
-  ; avance vers l'avant
-  if (free-ahead? speed = nobody) [forward-move speed]
-end
-
-
-
-
-

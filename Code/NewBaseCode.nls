@@ -1,0 +1,288 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; le code de l'equipe rouge 
+;; préfixe : FB-team
+;; robot : 
+;; mem0 cible x,y 
+;; mem1 type,etas 
+;;  etat 0 => Etat basique (par défaut)
+;;  etat 1 => retour base  
+;;  etat 2 => doit aller en position x,y ( mem0 )
+
+;; 
+;; base 
+;; mem1 : liste des truc a ce rapler a definir 
+;;
+;; mem8 : list des robot a créer 
+;; mem0 et mem1 : coordonnees d'une cible
+;; mem5 : indique si le robot a ou non une cible sélectionnée
+;; mem4 : indique si un harvester est en mode retour à la base
+;; mem4 [roketluncher ]: indique si un roquette luncher est en protection de la base 
+;; mem6 : le nb de harvesters à créer
+;; mem7 : le nb de rocket-launchers à créer
+;; mem8 : le nb d'explorers à créer
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+to FB-team-ask-for-energy [ b n ] ;; ask to base b to give myself n energy if it energy > 1000
+  ask b [ if (energy > 1000) [ give-energy myself n ]]
+end
+
+;;
+;; rentre à la base et si le robot transporte plus de 1000 unités de nourriture ou si son énergie est inférieure à 500 ou si c'est un rocket-launcher qui n'a plus de missiles
+;;
+to FB-team-random-move
+  if ((breed = RocketLaunchers and (mem5 = 0)) or (breed = Explorers)) 
+    [random-move] ;; mvt aleatoir
+  ;;[FB-random-move -20 20 ]
+end
+
+to FB-Team-move-towards-xy [ x y ]
+  set heading towardsxy x y  
+  Fb-Team-move-forward
+end
+
+;;move on the target direction care meme 1 should be 2
+to Fb-Team-move-towards-target 
+    FB-Team-move-towards-xy item 0 mem0 item 1 mem0 
+end
+
+to FB-Team-go-back-to-my-Base 
+    let b min-one-of my-bases [ distance myself ]
+    if (b != nobody and distance b > 2) [
+        set heading towards b
+        FB-Team-move-forward 
+    ]
+end
+
+to FB-Team-move-forward
+    let nbTurn 0
+    ifelse(free-ahead? speed = nobody) 
+    [
+        forward-move speed
+    ][
+        rt 45 ;;regarde a droite 
+        ifelse(free-ahead? speed = nobody )
+        [
+            forward-move speed ;; avance 
+            rt -45         ;;remet toi dans la bonne direction
+        ][
+           rt -90          ;;regarde a gauche 
+           ifelse(free-ahead? speed = nobody)
+           [
+            forward-move speed ;;avance
+            rt 45          ;;remet toi dans la bonne direcion
+           ][
+               rt -45 ;;demis tours
+               if (free-ahead? speed = nobody )[
+                   forward-move speed ;; avance 
+               ]
+           ]  
+        ]
+    ]
+
+end
+
+to FB-team-harversers-go-on-food-or-random-move 
+    let f min-one-of perceive-food [ distance myself]
+    ifelse (f != nobody) 
+    [  ;; si j'ai persu de la nouriture 
+    ifelse (distance f) <= 2 ;; si la nouriture est plus proche que 2 unité ( je peut la prendre )
+      [ take-food f ] ;; je la prend 
+      ;;else 
+      [ 
+        set heading towards f
+        Fb-Team-move-forward 
+      ]
+      ]
+    [
+        random-move
+    ]
+end
+to Fb-team-harverser-go-take-wall 
+    let w min-one-of (perceive-walls) [distance myself]
+    if (w != nobody)[
+        ifelse (distance w <= 2)
+            [take-wall w] 
+            [
+                set heading towards w
+                FB-Team-move-forward
+            ]
+    ]
+end
+
+to-report Fb-team-on-State-ShouldGoxy
+    report item 1 mem1 = 2 
+end
+
+to FB-team-set-target-xy [ x y ]
+    set mem0 replace-item 0 mem0 x
+    set mem0 replace-item 1 mem1 y
+end 
+;;not sure 
+to FB-team-set-target-t [ t ]
+    set mem0  t 
+    set mem1 replace-item 1 mem1 2
+end
+
+to FB-team-call-rocket-launcher-xy [ x y ]
+  let rl min-one-of perceive-specific-robots color RocketLaunchers [ distancexy x y ]
+  if (rl != nobody) [ ask rl [ FB-team-set-target-xy x y ]]
+end
+
+to FB-team-call-rocket-launcher-t [ t ]
+  let rl min-one-of perceive-specific-robots color RocketLaunchers [ distance t ]
+  if (rl != nobody) [ ask rl [ FB-team-set-target-t t  ]]
+end
+
+to FB-team-call-explorer [ x y  ]
+  let ex one-of perceive-specific-robots color Explorers
+  if (ex != nobody) [
+    ask ex [ FB-team-set-target-xy x y ]
+  ]
+end
+;;envoi un explorer en x,y
+to FB-team-call-harvester [ x y ]
+  let h min-one-of perceive-specific-robots color harvesters [ distancexy x y ]
+  if (h != nobody) [ ask h [ FB-team-set-target-xy x y ]]
+end
+;;cherche une cible si on trouve une cible pas en etas chasse si onoreste a l'etas defaut 
+;; si on etais a l'etas chasse 
+to Fb-team-robot-try-select-ennemi-target 
+    let h min-one-of perceive-robots ennemy [ distance myself ]
+    ifelse ( h != nobody ) [
+        FB-team-set-target-t h 
+        set mem1 replace-item 1 mem1 10 ;; mem1[1] = 10
+    ][
+        if ( item 1 mem1 = 10 )[ ;; si on etais en etas de tire 
+            set mem0 replace-item 1 mem1 0
+        ]
+    ]
+end
+;; si on est a l'etas a une cible a tiré tire 
+to Fb-Team-robot-try-shoot 
+    if( item 1 mem1 = 10) [
+        ;;launch-roket towardsxy item 0 mem0 item 1 mem0  
+    ]
+end
+
+to FB-team-drive-harvesters
+  let food one-of perceive-food
+  if (food != nobody) [
+    FB-team-call-harvester [xcor] of food [ycor] of food 
+  ]
+end
+
+
+
+;;;;;;;;;;;;;;;;;;; utile ;;;;;;;;;;;;;;;;;;;;;;;;;; 
+;;increment the value at index by increment 
+to-report FB-team-Increment-List [ inputlist index increment]
+  report replace-item index inputlist (item index inputlist + increment)
+end
+to-report FB-team-on-base [ b ]
+    report b != nobody and (distance b <= 2)
+end
+to-report FB-Team-maxEnergie 
+   if (breed = Harvesters)[
+       report harvester-nrj
+   ]
+   if (breed = RocketLaunchers)[
+       report rocket-launcher-nrj
+   ]
+   if (breed = Explorers)[
+       report explorer-nrj
+   ]
+end
+;;;;;;;;;;;;;;;;; main program ;;;;;;;;;;;;;;
+
+
+to goRedHarvester
+end
+to goRedExplorer
+end
+
+
+to FB-Team-Refiull-energie 
+    let b min-one-of my-bases [ distance myself ]
+    if (FB-team-on-base b )[
+        FB-team-ask-for-energy b FB-Team-maxEnergie - energy
+    ]
+end
+
+to FB-Ream-Restock-misiles
+ let b min-one-of my-bases [ distance myself ] 
+  if (FB-team-on-base b )[
+    new-missile 5
+  ]
+end
+
+to goRedRocketLauncher
+  FB-Team-Refiull-energie
+  if(nb-missiles = 0 )
+  [
+    FB-Ream-Restock-misiles
+  ]
+  let b min-one-of my-bases [ distance myself ]
+  if (FB-team-on-base b and ( item 1 mem1 = 1 ) )
+            [    
+                set mem1 replace-item 1 mem1 0 ;; libre 
+            ]
+   ifelse ( energy < 1000  or nb-missiles = 0 )[
+        FB-Team-go-back-to-my-Base
+   ][
+    ;; move 
+   ]
+       
+end
+;; creat an explorer and decrement the number of explorer to creat 
+to FB-team-creat-explorer
+    new-Explorer self
+    FB-team-Increment-List mem1 3 -1
+end
+;; creat and harverster and decrement the number of harverster to creat 
+to FB-team-creat-harverster
+    new-Harvester self
+    FB-team-Increment-List mem1 2 -1
+end
+;; creat and roketluncher and decrement the number of roketluncher to creat 
+to FB-team-creat-roketluncher
+    new-RocketLauncher self
+    FB-team-Increment-List mem1 3 -1
+end
+;; creat robot if should creat it ( mem1 : )
+to Fb-Team-Base-new-robot-if-should
+  if (item 1 mem1 > 0) [FB-team-creat-explorer]
+  if (item 2 mem1 > 0) [FB-team-creat-harverster]
+  if (item 3 mem1 > 0) [FB-team-creat-roketluncher]  
+   
+end
+;;;mem1 : [
+;;; 0 : nombre de tick passé depuis t0
+;;  1 : nombre d’explorer crée,
+;;  2 : nombre d’harverster crée 
+;;  3 : nombre d’roketluncher crée 
+;;  ]
+;;FB-team-Increment-List [ inputlist index increment]
+to goRedBase
+  FB-team-Increment-List mem1 0 1 ;;increment tick
+  Fb-Team-Base-new-robot-if-should 
+end  
+
+
+
+;; procedure pour initialiser les explorers verts
+to initRedExplorer
+  set mem1 replace-item 3 mem1 3
+end
+
+;; procedure pour initialiser les rocket-launchers verts
+to initRedRocketLauncher
+end
+
+;; procedure pour initialiser les harvesters verts
+to initRedHarvester
+end
+
+;; procedure pour initialiser les bases verts
+to initRedBase
+end
