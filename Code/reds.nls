@@ -768,8 +768,13 @@ end
 ;;;mem1 : [
 ;; 0 : nombre de tick passé depuis t0
 ;; 1 : nombre d’explorer a crée,
+;;   0 : nonbre d'explorer de type 0 à créer
+;;   1 : nombre d'explorer de type 1 à créer
+;;   2 : nombre d'explorer de type 2 à créer
 ;; 2 : nombre d’harverster a crée 
-;; 3 : nombre d’roketluncher a crée
+;;   0 : nonbre de harvester de type 0 à créer
+;; 3 : nombre de roketluncher a crée
+;;   0 : nonbre d'roketluncher de type 0 à créer
 ;; 5 : nombre d’explorer  crée,
 ;; 6 : nombre d’harverster  crée 
 ;; 7 : nombre d’roketluncher  crée
@@ -777,7 +782,17 @@ end
 ;;  ]
 to initRedBase
   set mem0 list (xcor + 10) ycor
-  set mem1 [0 [0 0 0] [0] [0] 0 [0 0 0] [0] [0] 0] ;; 7 
+  set mem1 [
+    0        ;; Ticks
+    [0 0 0]  ;; Explorers à créer
+    [0]      ;; Harvesters à créer
+    [0]      ;; RocketLaunchers à créer
+    0        ;; ??
+    [0 0 0]  ;; Explorrs créés
+    [0]      ;; Harvesters créés
+    [0]      ;; RocketLaunchers créés
+    0        ;; Type du prochain robot
+  ] ;; 8 
   set mem1 FB-team-Increment-List mem1 0 1 ;; intit tick
   FB-Team-Base-createExplorersWhenPossible 0 5 ;;créer 5 explorer de type 0
   FB-Team-Base-createExplorersWhenPossible 2 20 ;;créer 10 explorer de type 2
