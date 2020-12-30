@@ -53,8 +53,7 @@ end
 
 ;; Suicide on target
 to FB-Team-suicideOnTarget
-  let b min-one-of (perceive-base ennemy) [ distance myself ]
-  ifelse (b != nobody and (distance b) < 2) [ ;; Si on est assez proche de la base adverse, on fonce dessus sans s'arrêter
+  ifelse (FB-Team-Distance-To-Target-less-than 2) [ ;; Si on est assez proche de la cible, on fonce dessus sans s'arrêter
     forward-move speed
   ][
     FB-team-move-towards-target ;; Sinon on se dirige vers elle
@@ -416,7 +415,7 @@ to FB-TEAM-Explorer-movement
   
   if (FB-Team-getType = 2) [
     if (FB-Team-Explorer-onState-goNextToBase)        [Fb-Team-move-towards-target]
-    if (FB-Team-Explorer-onState-waitForCompanions)   [FB-Team-wander-around-xy (item 0 mem0) (item 1 mem0) 5]
+    if (FB-Team-Explorer-onState-waitForCompanions)   [FB-Team-wander-around-target 5]
     if (FB-Team-Explorer-onState-goToEnemyBase)       [FB-team-move-towards-xy (xcor + 10) (item 1 mem0)] ;; Se déplce uniquement sur x, à hauteur de la base
     if (FB-Team-Explorer-onState-trampleOnPlantation) [FB-Team-trampleOnPlantations]
     if (FB-Team-Explorer-onState-suicideOnBase)       [FB-Team-suicideOnTarget]
@@ -441,7 +440,7 @@ end
 
 to FB-Team-Explorer-handleWaitForCompanions
   if (FB-Team-Explorer-onState-goNextToBase and 
-    (distancexy (item 0 mem0) (item 1 mem0)) < 5) [ ;; On passe à l'état suivant si on est dans un rayon de 5 du point d'attente
+    (FB-Team-Distance-To-Target < 5)) [ ;; On passe à l'état suivant si on est dans un rayon de 5 du point d'attente
     FB-Team-Explorer-setState-waitForCompanions
   ]
 end
@@ -467,7 +466,7 @@ to FB-Team-Explorer-handleSuicideOnBase
   ;; On passe à l'état suicide si notre énergie est inférieure à celle qui nous faudrait pour rejoindre la base adverse, avec une chance de nous tirer dessus de 25%
   ;; et une sécurité de 0.5
   if (FB-Team-Explorer-onState-trampleOnPlantation and
-    energy < (distancexy (item 0 mem0) (item 1 mem0)) * (explorer-metabolism + missile-robot-damage / 4) + 0.5) [
+    energy < (FB-Team-Distance-To-Target * (explorer-metabolism + missile-robot-damage / 4) + 0.5)) [
     FB-team-explorer-setState-suicideOnBase
   ]
 end
@@ -781,7 +780,7 @@ to initRedBase
   set mem1 [0 [0 0 0] [0] [0] 0 [0 0 0] [0] [0] 0] ;; 7 
   set mem1 FB-team-Increment-List mem1 0 1 ;; intit tick
   FB-Team-Base-createExplorersWhenPossible 0 5 ;;créer 5 explorer de type 0
-  FB-Team-Base-createExplorersWhenPossible 2 10 ;;créer 10 explorer de type 2
+  FB-Team-Base-createExplorersWhenPossible 2 20 ;;créer 10 explorer de type 2
   FB-Team-Base-createHarvestersWhenPossible 0 5 ;;créer 5 harverster de type 0
   FB-Team-Base-createRocketLaunchersWhenPossible 0 5 ;;créer 5 roketluncher de type 0
 end
