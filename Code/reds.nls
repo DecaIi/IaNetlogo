@@ -447,7 +447,7 @@ end
 
 to FB-Team-Explorer-handleGoToEnemyBase
   if (FB-Team-Explorer-onState-waitForCompanions and
-    count (perceive-specific-robots color Explorers) with [(item 0 mem1) = 2] >= 10) [ ;; On passe à l'état suivant si il y a 10 companions au moins
+    count (perceive-specific-robots color Explorers) with [(item 0 mem1) = 2] >= 8) [ ;; On passe à l'état suivant si il y a 10 companions au moins
     FB-team-explorer-setState-goToEnemyBase
   ]
 end
@@ -637,6 +637,7 @@ to FB-Team-createHarvesterNow [ t ]
   FB-Team-Base-incrementCreationList 2 t -1
   FB-Team-Base-setTypeOfNewRobot t
   new-Harvester self
+  show "new harvester"
   FB-Team-Base-incrementCreatedList 6 t 1
 end
 
@@ -652,21 +653,21 @@ end
 to Fb-Team-Base-new-robot-if-should
   let i 0
   
-  let explorersCreationList (item 1 mem1)
+  let harvestersCreationList (item 2 mem1)
   set i 0
-  foreach explorersCreationList [ ex ->
-    if (ex > 0) [ 
-      FB-Team-createExplorerNow i
+  foreach harvestersCreationList [ ha ->
+    if (ha > 0 and energy > harvester-cost + 100) [ 
+      FB-Team-createHarvesterNow i
       stop
     ]
     set i (i + 1)
   ]
   
-  let harvestersCreationList (item 2 mem1)
+  let explorersCreationList (item 1 mem1)
   set i 0
-  foreach harvestersCreationList [ ha ->
-    if (ha > 0) [ 
-      FB-Team-createHarvesterNow i
+  foreach explorersCreationList [ ex ->
+    if (ex > 0 and energy > explorer-cost + 100) [ 
+      FB-Team-createExplorerNow i
       stop
     ]
     set i (i + 1)
@@ -675,7 +676,7 @@ to Fb-Team-Base-new-robot-if-should
   let rocketLaunchersCreationList (item 3 mem1)
   set i 0
   foreach rocketLaunchersCreationList [ rl ->
-    if (rl > 0) [ 
+    if (rl > 0 and energy > rocket-launcher-cost + 100) [ 
       FB-Team-createRocketLauncherNow i
       stop
     ]
@@ -795,7 +796,7 @@ to initRedBase
   ] ;; 8 
   set mem1 FB-team-Increment-List mem1 0 1 ;; intit tick
   FB-Team-Base-createExplorersWhenPossible 0 5 ;;créer 5 explorer de type 0
-  FB-Team-Base-createExplorersWhenPossible 2 20 ;;créer 10 explorer de type 2
+  FB-Team-Base-createExplorersWhenPossible 2 10 ;;créer 10 explorer de type 2
   FB-Team-Base-createHarvestersWhenPossible 0 5 ;;créer 5 harverster de type 0
   FB-Team-Base-createRocketLaunchersWhenPossible 0 5 ;;créer 5 roketluncher de type 0
 end
