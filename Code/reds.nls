@@ -169,7 +169,7 @@ end
 
 to FB-Team-call-all-roket-launcher-enmyR[ r ]
   let allRl perceive-specific-robots color RocketLaunchers
-  ask allRl [
+  ask allRl [ 
     FB-team-set-target-xy [xcor] of r [ycor] of r
     FB-Team-Roket-Launcher-SetState-DrivedToEnmy
   ]
@@ -433,7 +433,7 @@ to goRedExplorer
   FB-Team-Explorer-StateHandler b
   FB-TEAM-Explorer-movement  
   FB-team-drive-harvesters-on-perceive-food
-   
+  FB-Team-drive-Roket-luncher-on-preceive-enemy
 end
 
 to FB-Team-Explorer-StateHandler [b]
