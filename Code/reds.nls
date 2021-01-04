@@ -144,6 +144,7 @@ end
 ;;;; Target Setings
 ;;;;;;;;;;;;;;;;;;;;;;;;
 to FB-team-set-target-xy [ x y ]
+    set mem0 [0 0]
     set mem0 replace-item 0 mem0 x
     set mem0 replace-item 1 mem0 y
 end 
@@ -167,10 +168,10 @@ to FB-team-call-rocket-launcher-t [ t ]
   if (rl != nobody) [ ask rl [ FB-team-set-target-t t  ]]
 end
 
-to FB-Team-call-all-roket-launcher-enmyR[ r ]
+to FB-Team-call-all-roket-launcher-enmyxyCoord[ x y ]
   let allRl perceive-specific-robots color RocketLaunchers
   ask allRl [ 
-    FB-team-set-target-xy [xcor] of r [ycor] of r
+    FB-team-set-target-xy x y
     FB-Team-Roket-Launcher-SetState-DrivedToEnmy
   ]
 end
@@ -207,7 +208,7 @@ end
 to FB-Team-drive-Roket-luncher-on-preceive-enemy
   let r min-one-of perceive-robots ennemy [distance myself]
   if(r != nobody ) [
-    FB-Team-call-all-roket-launcher-enmyR r
+    FB-Team-call-all-roket-launcher-enmyxyCoord [xcor] of r [ycor] of r
   ]
 end
 
@@ -719,6 +720,7 @@ end
 
 to FB-Team-Roket-Launcher-SetState-DrivedToEnmy
   FB-Team-Set-State 11
+  set mem3 99
 end
 
 to-report FB-Team-Roket-Launcher-OnState-DrivedToEnmy
