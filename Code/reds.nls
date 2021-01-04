@@ -637,7 +637,6 @@ to FB-Team-createHarvesterNow [ t ]
   FB-Team-Base-incrementCreationList 2 t -1
   FB-Team-Base-setTypeOfNewRobot t
   new-Harvester self
-  show "new harvester"
   FB-Team-Base-incrementCreatedList 6 t 1
 end
 
