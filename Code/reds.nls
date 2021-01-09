@@ -139,6 +139,48 @@ to FB-Team-wander-around-xy [ x y radius ]
   ]
 end
 
+;; Try to follow object [x, y] while staying around our mem0 target within radius range
+to FB-Team-tryFollowConstrainedByTarget [ x y radius ]
+  let a ((item 1 mem0) - y) / ((item 0 mem0) - x)
+  let b (item 1 mem0) - (a * (item 0 mem0))
+  let distanceToLane (ycor - a * xcor + b)
+  show "dist:"
+  show distanceToLane
+  show "me:"
+  show xcor
+  show "rl:"
+  show (item 0 mem0)
+  ifelse (distanceToLane < 50 and distanceToLane > -50) [
+    show "OUT -- OUT -- OUT -- OUT"
+    set heading towardsxy (item 0 mem0) (item 1 mem0)
+    ifelse (distanceToLane > 0) [
+      ifelse (xcor < (item 0 mem0)) [
+        lt 90 ;; Au dessus et à gauche
+        show "up left"
+      ][
+        rt 90 ;; Au dessus et à droite
+        show "up right"
+      ]
+      FB-Team-move-forward
+    ][
+      ifelse (xcor < (item 0 mem0)) [
+        rt 90 ;; En dessous et à gauche
+        show "bottom left"
+      ][
+        lt 90 ;; En dessous et à droite
+        show "bottom right"
+      ]
+      FB-Team-move-forward
+    ]
+  ][
+    ifelse (FB-Team-Distance-To-Target >= radius - 1) [
+      FB-Team-move-towards-target
+    ][
+      FB-Team-move-towards-xy x y
+    ]
+  ]
+end
+
 ;;;;;;;;;;;;;;;;;;;;;
 ;;;; Target Setings
 ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -243,10 +285,24 @@ end
 ;; si on est a l'etas a une cible a tiré tire 
 to Fb-Team-robot-try-shoot 
     if( item 1 mem1 = 10) [
-    launch-faf  mem0
-    launch-rocket towardsxy [xcor] of mem0 [ycor] of mem0
+    ifelse (is-turtle? mem0) [
+      launch-faf  mem0
+      launch-rocket towardsxy [xcor] of mem0 [ycor] of mem0
+    ] [
+      launch-rocket towardsxy (item 0 mem0) (item 1 mem0)
+      FB-Team-Set-State-BasicState
+    ]
   ]
     ;;[ launch-faf mem0 set mem5 0 ]
+end
+
+to FB-Team-askRocketLauncherToShootOnTargetIfPossible [ rl x y ]
+  ask rl [
+    if (not FB-Team-Rocket-Launcher-OnState-TargetingEnemy) [
+      FB-team-set-target-xy x y
+      FB-Team-Rocket-Launcher-SetState-TargetingEnemy
+    ]
+  ]
 end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -433,7 +489,7 @@ to goRedExplorer
   FB-Team-Explorer-StateHandler b
   FB-TEAM-Explorer-movement  
   FB-team-drive-harvesters-on-perceive-food
-  FB-Team-drive-Roket-luncher-on-preceive-enemy
+  ;;FB-Team-drive-Roket-luncher-on-preceive-enemy
 end
 
 to FB-Team-Explorer-StateHandler [b]
@@ -441,6 +497,11 @@ to FB-Team-Explorer-StateHandler [b]
     if (FB-team-on-base b and ( item 1 mem1 = 1 ) )[FB-Team-Set-State-BasicState] ;;si on retournais a la base est qu'on est en contact c'est bo
  ;; FB-Team-Handel-Return-Base-State  ;;  si pas d'energie ou pas de misile revien a la base 
  ;; FB-Team-Handel-Return-To-Base-For-Deposing-Food ;; return to base if more thant 500 food cariing
+  ]
+  
+  if (FB-Team-getType = 1) [
+    FB-Team-Explorer-setState-searchForAloneRL
+    FB-Team-Explorer-handleSearchForAloneRL
   ]
   
   if (FB-Team-getType = 2) [
@@ -458,6 +519,10 @@ to FB-TEAM-Explorer-movement
     if(Fb-team-on-State-ShouldGoxy) [Fb-Team-move-towards-target]
     
     random-move
+  ]
+  
+  if (FB-Team-getType = 1) [
+    ;;if (FB-Team-Explorer-onState-searchForAloneRL)    []
   ]
   
   if (FB-Team-getType = 2) [
@@ -518,11 +583,59 @@ to FB-Team-Explorer-handleSuicideOnBase
   ]
 end
 
+to FB-Team-Explorer-handleSearchForAloneRL
+  if (FB-Team-Explorer-onState-searchForAloneRL) [
+    let rl min-one-of ((perceive-specific-robots color RocketLaunchers) with [(item 0 mem1) = 1]) [ distance myself ]
+    if (rl != nobody) [
+      FB-team-set-target-xy [xcor] of rl [ycor] of rl
+      
+      let enemy min-one-of perceive-robots ennemy [ distance myself ]
+      ifelse (enemy != nobody) [
+        let x [xcor] of enemy
+        let y [ycor] of enemy
+        set mem2 replace-item 0 mem2 x
+        set mem2 replace-item 1 mem2 y
+        FB-Team-askRocketLauncherToShootOnTargetIfPossible rl x y
+        FB-Team-tryFollowConstrainedByTarget (item 0 mem2) (item 1 mem2) 7
+        ;;FB-Team-wander-around-target 7
+      ][
+        FB-Team-wander-around-target 7
+      ]
+    ]
+  ]
+end
+
+to FB-Team-Explorer-handleTryFollowEnemy
+  let enemy min-one-of perceive-robots ennemy [ distance myself ]
+  ifelse (enemy != nobody) [
+    
+  ][
+    FB-Team-Explorer-setState-searchForAloneRL
+  ]
+end
+  
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;;  Explorers state setters/reporters
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+to FB-Team-Explorer-setState-searchForAloneRL
+  set mem1 replace-item 1 mem1 101 
+end
+
+to-report FB-Team-Explorer-onState-searchForAloneRL
+  report item 1 mem1 = 101 
+end
+
+to FB-Team-Explorer-setState-tryFollowEnemy
+  set mem1 replace-item 1 mem1 102 
+end
+
+to-report FB-Team-Explorer-onState-tryFollowEnemy
+  report item 1 mem1 = 102 
+end
 
 to FB-Team-Explorer-setState-waitForCompanions
   set mem1 replace-item 1 mem1 201 
@@ -656,7 +769,7 @@ end
 to FB-Team-RocketLauncher-State-Handler [ b ] ;;  b closest base 
   FB-Team-Handel-Roket-Launcher-DrivedToEnemy-to-BasicState
   FB-Team-Handel-Basic-State-After-ReturnToBase-Succed b ;;si on retournais a la base est qu'on est en contact c'est bs
-  FB-Team-robot-try-select-ennemi-target
+  ;;FB-Team-robot-try-select-ennemi-target
   FB-Team-Handel-Return-Base-State  ;;  si pas d'energie ou pas de misile revien a la base 
  
 end
@@ -920,9 +1033,11 @@ to initRedBase
     0        ;; Type du prochain robot
   ] ;; 8 
   set mem1 FB-team-Increment-List mem1 0 1 ;; intit tick
-  FB-Team-Base-createExplorersWhenPossible 0 5 ;;créer 5 explorer de type 0
-  FB-Team-Base-createExplorersWhenPossible 2 10 ;;créer 10 explorer de type 2
-  FB-Team-Base-createHarvestersWhenPossible 0 5 ;;créer 5 harverster de type 0
-  FB-Team-Base-createRocketLaunchersWhenPossible 0 5 ;;créer 5 roketluncher de type 0
-  FB-Team-Base-createRocketLaunchersWhenPossible 1 10
+  ;;FB-Team-Base-createExplorersWhenPossible 0 5 ;;créer 5 explorer de type 0
+  ;;FB-Team-Base-createExplorersWhenPossible 2 10 ;;créer 10 explorer de type 2
+  ;;FB-Team-Base-createHarvestersWhenPossible 0 5 ;;créer 5 harverster de type 0
+  ;;FB-Team-Base-createRocketLaunchersWhenPossible 0 5 ;;créer 5 roketluncher de type 0
+  ;;FB-Team-Base-createRocketLaunchersWhenPossible 1 10
+  FB-Team-Base-createRocketLaunchersWhenPossible 1 1
+  FB-Team-Base-createExplorersWhenPossible 1 1
 end
