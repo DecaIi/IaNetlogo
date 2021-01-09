@@ -122,6 +122,10 @@ to FB-Team-wander-around-target [ radius ]
   FB-team-wander-around-xy (item 0 mem0) (item 1 mem0) radius
 end
 
+to FB-Team-wander-around-entity [ent radius]
+  FB-team-wander-around-xy [xcor] of ent [ycor] of ent radius
+end
+
 ;; Random move around x y in specified radius
 to FB-Team-wander-around-xy [ x y radius ]
   ifelse ((distancexy x y) > radius)
@@ -139,6 +143,7 @@ end
 ;;;; Target Setings
 ;;;;;;;;;;;;;;;;;;;;;;;;
 to FB-team-set-target-xy [ x y ]
+    set mem0 [0 0]
     set mem0 replace-item 0 mem0 x
     set mem0 replace-item 1 mem0 y
 end 
@@ -162,6 +167,14 @@ to FB-team-call-rocket-launcher-t [ t ]
   if (rl != nobody) [ ask rl [ FB-team-set-target-t t  ]]
 end
 
+to FB-Team-call-all-roket-launcher-enmyxyCoord[ x y ]
+  let allRl perceive-specific-robots color RocketLaunchers
+  ask allRl [ 
+    FB-team-set-target-xy x y
+    FB-Team-Roket-Launcher-SetState-DrivedToEnmy
+  ]
+end
+
 ;;envoi un explorer en x,y
 to FB-team-call-explorer [ x y  ]
   let ex one-of perceive-specific-robots color Explorers
@@ -177,14 +190,24 @@ to FB-team-call-harvester [ x y ]
   [ 
     ask h [ 
       FB-team-set-target-xy x y 
+      FB-Team-Harvester-SetState-ShouldGoxy-For-Food 
+      set mem3 21
     ]
   ]
 end
 
-to FB-team-drive-harvesters-on-peceive-food
+to FB-team-drive-harvesters-on-perceive-food
   let food one-of perceive-food
   if (food != nobody) [
     FB-team-call-harvester [xcor] of food [ycor] of food 
+  ]
+end
+
+
+to FB-Team-drive-Roket-luncher-on-preceive-enemy
+  let r min-one-of perceive-robots ennemy [distance myself]
+  if(r != nobody ) [
+    FB-Team-call-all-roket-launcher-enmyxyCoord [xcor] of r [ycor] of r
   ]
 end
 
@@ -194,21 +217,18 @@ end
 
 to Fb-team-base-try-select-ennemi-target-and-shoot
   let r min-one-of perceive-robots ennemy [distance myself] 
-  set mem3 0
   if ( r != nobody ) 
   [
    if ( not any? perceive-robots-in-cone color towards r) [ 
     launch-faf r 
     launch-rocket towardsxy [xcor] of r [ycor] of r
-    set mem3 1
     ]
   ]
-    
 end
 
 ;;cherche une cible si on trouve une cible pas en etas chasse si onoreste a l'etas defaut 
 ;; si on etais a l'etas chasse 
-to Fb-team-robot-try-select-ennemi-target 
+to FB-Team-robot-try-select-ennemi-target 
     let h min-one-of perceive-robots ennemy [ distance myself ]
     ifelse ( h != nobody ) [
     FB-team-set-target-t h
@@ -299,19 +319,26 @@ end
 ;;set state to return base if need  
 to FB-Team-Handel-Return-Base-State 
   if (FB-Team-Need-energy or (breed = RocketLaunchers and nb-missiles = 0) )[
-    set mem1 FB-Tem-Set-State 1 
+    FB-Team-Set-State-ShouldGoBase
   ]
 end 
 to FB-Team-Handel-Return-To-Base-For-Deposing-Food
   if( carrying-food? > 500 )
-  [ set mem1 FB-Tem-Set-State 1]
+  [ FB-Team-Set-State-ShouldGoBase]
 end
 
 to FB-Team-Return-To-Basic-State-On-Target
   if (Fb-team-on-State-ShouldGoxy and FB-Team-Distance-To-Target <= 2)
   [  
-    set mem1 FB-Tem-Set-State 0 
+    FB-Team-Set-State-BasicState
   ]
+end
+
+to FB-Team-Handel-Basic-State-After-ReturnToBase-Succed [b]
+  if (FB-team-on-base b and ( FB-Team-on-State-ShouldGoBase ) )
+    [
+      FB-Team-Set-State-BasicState
+    ]
 end
 
 ;;;;;;;;;;;;;;;;;;;;;;
@@ -346,13 +373,31 @@ end
 to-report FB-Tem-Report-State
   report item 1 mem1
 end
-;;;;;;;
-;; Stat Set 
-;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; -----------------------GLOBAL Set State----------------------------
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-to-Report FB-Tem-Set-State [ state ]
-  report replace-item 1 mem1 state 
+to FB-Team-Set-State [ state ]
+  set mem1 replace-item 1 mem1 state 
 end
+
+to FB-Team-Set-State-BasicState
+  FB-Team-Set-State 0
+end
+
+to FB-Team-Set-State-ShouldGoBase
+  FB-Team-Set-State 1
+end
+
+to FB-Team-Set-State-ShouldGoxy
+  FB-Team-Set-State 2
+end 
+
+
+
+
 
 ;;;;;;;;;;;;;;;;; main program ;;;;;;;;;;;;;;
  
@@ -387,12 +432,13 @@ to goRedExplorer
   ]
   FB-Team-Explorer-StateHandler b
   FB-TEAM-Explorer-movement  
-  FB-team-drive-harvesters-on-peceive-food
+  FB-team-drive-harvesters-on-perceive-food
+  FB-Team-drive-Roket-luncher-on-preceive-enemy
 end
 
 to FB-Team-Explorer-StateHandler [b]
   if (FB-Team-getType = 0) [
-    if (FB-team-on-base b and ( item 1 mem1 = 1 ) )[set mem1 FB-Tem-Set-State 0] ;;si on retournais a la base est qu'on est en contact c'est bo
+    if (FB-team-on-base b and ( item 1 mem1 = 1 ) )[FB-Team-Set-State-BasicState] ;;si on retournais a la base est qu'on est en contact c'est bo
  ;; FB-Team-Handel-Return-Base-State  ;;  si pas d'energie ou pas de misile revien a la base 
  ;; FB-Team-Handel-Return-To-Base-For-Deposing-Food ;; return to base if more thant 500 food cariing
   ]
@@ -410,6 +456,7 @@ to FB-TEAM-Explorer-movement
   if (FB-Team-getType = 0) [
     if(FB-Team-on-State-ShouldGoBase) [FB-Team-go-back-to-my-Base]
     if(Fb-team-on-State-ShouldGoxy) [Fb-Team-move-towards-target]
+    
     random-move
   ]
   
@@ -523,22 +570,14 @@ end
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-to FB-Team-Harverster-StateHandler [b]
-  if (FB-team-on-base b and ( FB-Team-on-State-ShouldGoBase ) )
-  [
-    set mem1 FB-Tem-Set-State 0
-  ] ;;si on retournais a la base est qu'on est en contact c'est bo
-  FB-Team-Handel-Return-Base-State ;; return to base if nedd energy
-  FB-Team-Handel-Return-To-Base-For-Deposing-Food ;; return to base if more thant 500 food cariing 
-  FB-Team-Return-To-Basic-State-On-Target
-end
-
 to FB-TEAM-Harvester-movement
-  if(FB-Team-on-State-ShouldGoBase)[FB-Team-go-back-to-my-Base]
-  if(Fb-team-on-State-ShouldGoxy) [ Fb-Team-move-towards-target ]
-  FB-Team-Handel-Return-To-Base-For-Deposing-Food
-  FB-team-harversers-go-on-food-if-detected
-  random-move
+  if (FB-Team-getType = 0 ) [
+    if(FB-Team-on-State-ShouldGoBase)[FB-Team-go-back-to-my-Base]
+    if(Fb-team-on-State-ShouldGoxy) [ Fb-Team-move-towards-target ]
+    FB-team-harversers-go-on-food-if-detected ;; try to detect food close and go on it if the is 
+    if(FB-Team-Harvester-OnState-ShouldGoxy-For-Food) [ Fb-Team-move-towards-target]
+    random-move
+  ]
 end
 
 to FB-Team-Harvester-Handel-Food
@@ -563,6 +602,50 @@ to goRedHarvester
   FB-TEAM-Harvester-movement
   FB-Team-Harvester-Handel-Food  
 end
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;  HARVESTERS change handlers
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+to FB-Team-Harverster-StateHandler [b]
+  if (FB-Team-getType = 0 )[
+    FB-Team-Return-To-Basic-State-On-Target
+    FB-Team-Harvester-Handel-BasicState-If-TargetFoodInDetectionRange
+    FB-Team-Handel-Basic-State-After-ReturnToBase-Succed b
+     ;;si on retournais a la base est qu'on est en contact c'est bo
+    FB-Team-Handel-Return-Base-State ;; return to base if nedd energy
+    FB-Team-Handel-Return-To-Base-For-Deposing-Food ;; return to base if more thant 500 food cariing 
+  ]
+  
+  
+end
+
+
+to FB-Team-Harvester-Handel-BasicState-If-TargetFoodInDetectionRange
+  ;;show FB-Team-Distance-To-Target
+  if( FB-Team-Harvester-OnState-ShouldGoxy-For-Food and FB-Team-Distance-To-Target <= 5) 
+  [
+    FB-Team-Set-State-BasicState 
+  ]
+end 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; HARVESTERS state setters/reporters
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+to FB-Team-Harvester-SetState-ShouldGoxy-For-Food 
+  FB-Team-Set-State 21 ;; 
+end 
+
+to-report FB-Team-Harvester-OnState-ShouldGoxy-For-Food 
+  report item 1 mem1 = 21
+end
+
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -571,14 +654,21 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 to FB-Team-RocketLauncher-State-Handler [ b ] ;;  b closest base 
-  if (FB-team-on-base b and ( item 1 mem1 = 1 ) )[set mem1 FB-Tem-Set-State 0] ;;si on retournais a la base est qu'on est en contact c'est bo
+  FB-Team-Handel-Roket-Launcher-DrivedToEnemy-to-BasicState
+  FB-Team-Handel-Basic-State-After-ReturnToBase-Succed b ;;si on retournais a la base est qu'on est en contact c'est bs
+  FB-Team-robot-try-select-ennemi-target
   FB-Team-Handel-Return-Base-State  ;;  si pas d'energie ou pas de misile revien a la base 
+ 
 end
 
 to FB-TEAM-Roketlauncher-movement
+  let b min-one-of my-bases [ distance myself ]
   if(FB-Team-on-State-ShouldGoBase)[FB-Team-go-back-to-my-Base]
-  if(Fb-team-on-State-ShouldGoxy) [ Fb-Team-move-towards-target ]
-  random-move
+  if(Fb-team-on-State-ShouldGoxy) [ Fb-Team-move-towards-target]
+  if(FB-Team-Roket-Launcher-OnState-DrivedToEnmy) [Fb-Team-move-towards-target]
+  
+  if( FB-Team-getType = 0 ) [random-move]
+  if( FB-Team-getType = 1 ) [FB-Team-wander-around-entity b 10 ]
 end
 
 to goRedRocketLauncher
@@ -594,10 +684,46 @@ to goRedRocketLauncher
   FB-Team-RocketLauncher-State-Handler b ;; change the state if neeeded 
   FB-TEAM-Roketlauncher-movement   
   
-  Fb-team-robot-try-select-ennemi-target
+  
   Fb-Team-robot-try-shoot 
-  
-  
+end
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;  ROCKET LAUNCHER change handlers
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+to FB-Team-Handel-Roket-Launcher-DrivedToEnemy-to-BasicState
+  if(FB-Team-Roket-Launcher-OnState-DrivedToEnmy)
+  [
+    if( FB-Team-Distance-To-Target <= 5 ) [
+      FB-Team-Set-State-BasicState
+    ]
+  ]
+end
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; ROCKET LAUNCHER state setters/reporters
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+to FB-Team-Rocket-Launcher-SetState-TargetingEnemy
+   FB-Team-Set-State 10
+end
+
+to-report FB-Team-Rocket-Launcher-OnState-TargetingEnemy
+  report item 1 mem1 = 10 
+end
+
+to FB-Team-Roket-Launcher-SetState-DrivedToEnmy
+  FB-Team-Set-State 11
+  set mem3 99
+end
+
+to-report FB-Team-Roket-Launcher-OnState-DrivedToEnmy
+  report item 1 mem1 = 11
 end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -727,7 +853,7 @@ to goRedBase
   FB-Team-Base-increment-tick   
   Fb-Team-Base-new-robot-if-should  
   Fb-team-base-try-select-ennemi-target-and-shoot
-  FB-team-drive-harvesters-on-peceive-food
+  FB-team-drive-harvesters-on-perceive-food
   ;;new-missile 1
   ;;new-faf 1
 end  
@@ -786,11 +912,11 @@ to initRedBase
     0        ;; Ticks
     [0 0 0]  ;; Explorers à créer
     [0]      ;; Harvesters à créer
-    [0]      ;; RocketLaunchers à créer
+    [0 0]    ;; RocketLaunchers à créer
     0        ;; ??
     [0 0 0]  ;; Explorrs créés
     [0]      ;; Harvesters créés
-    [0]      ;; RocketLaunchers créés
+    [0 0]    ;; RocketLaunchers créés
     0        ;; Type du prochain robot
   ] ;; 8 
   set mem1 FB-team-Increment-List mem1 0 1 ;; intit tick
@@ -798,4 +924,5 @@ to initRedBase
   FB-Team-Base-createExplorersWhenPossible 2 10 ;;créer 10 explorer de type 2
   FB-Team-Base-createHarvestersWhenPossible 0 5 ;;créer 5 harverster de type 0
   FB-Team-Base-createRocketLaunchersWhenPossible 0 5 ;;créer 5 roketluncher de type 0
+  FB-Team-Base-createRocketLaunchersWhenPossible 1 10
 end
