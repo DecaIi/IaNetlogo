@@ -210,7 +210,7 @@ to FB-team-call-rocket-launcher-t [ t ]
 end
 
 to FB-Team-call-all-roket-launcher-enmyxyCoord[ x y ]
-  let allRl perceive-specific-robots color RocketLaunchers
+  let allRl (perceive-specific-robots color RocketLaunchers with [ item 0 mem1 != 1 ])
   ask allRl [ 
     FB-team-set-target-xy x y
     FB-Team-Roket-Launcher-SetState-DrivedToEnmy
@@ -596,8 +596,8 @@ to FB-Team-Explorer-handleSearchForAloneRL
         set mem2 replace-item 0 mem2 x
         set mem2 replace-item 1 mem2 y
         FB-Team-askRocketLauncherToShootOnTargetIfPossible rl x y
-        FB-Team-tryFollowConstrainedByTarget (item 0 mem2) (item 1 mem2) 7
-        ;;FB-Team-wander-around-target 7
+        ;;FB-Team-tryFollowConstrainedByTarget (item 0 mem2) (item 1 mem2) 7
+        FB-Team-wander-around-target 7
       ][
         FB-Team-wander-around-target 7
       ]
@@ -769,7 +769,7 @@ end
 to FB-Team-RocketLauncher-State-Handler [ b ] ;;  b closest base 
   FB-Team-Handel-Roket-Launcher-DrivedToEnemy-to-BasicState
   FB-Team-Handel-Basic-State-After-ReturnToBase-Succed b ;;si on retournais a la base est qu'on est en contact c'est bs
-  ;;FB-Team-robot-try-select-ennemi-target
+  FB-Team-robot-try-select-ennemi-target
   FB-Team-Handel-Return-Base-State  ;;  si pas d'energie ou pas de misile revien a la base 
  
 end
@@ -1038,6 +1038,6 @@ to initRedBase
   ;;FB-Team-Base-createHarvestersWhenPossible 0 5 ;;créer 5 harverster de type 0
   ;;FB-Team-Base-createRocketLaunchersWhenPossible 0 5 ;;créer 5 roketluncher de type 0
   ;;FB-Team-Base-createRocketLaunchersWhenPossible 1 10
-  FB-Team-Base-createRocketLaunchersWhenPossible 1 1
-  FB-Team-Base-createExplorersWhenPossible 1 1
+  FB-Team-Base-createRocketLaunchersWhenPossible 1 3
+  FB-Team-Base-createExplorersWhenPossible 1 3
 end
