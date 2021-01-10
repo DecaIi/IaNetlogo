@@ -511,6 +511,13 @@ to FB-Team-Explorer-StateHandler [b]
     FB-Team-Explorer-handleTrampleOnPlantation
     FB-Team-Explorer-handleSuicideOnBase
   ]
+  
+  if (FB-Team-getType = 3) [
+    FB-Team-Explorer-handleGoBetweenBases
+    FB-Team-Explorer-handleWaitForCompanions
+    FB-Team-Explorer-handleGoToEnemyBase
+    FB-Team-Explorer-handleSuicideOnBase
+  ]
 end
 
 to FB-Team-Explorer-movement
@@ -532,6 +539,13 @@ to FB-Team-Explorer-movement
     if (FB-Team-Explorer-onState-trampleOnPlantation) [FB-Team-trampleOnPlantations]
     if (FB-Team-Explorer-onState-suicideOnBase)       [FB-Team-suicideOnTarget]
   ]
+  
+  if (FB-Team-getType = 3) [
+    if (FB-Team-Explorer-onState-goBetweenBases)      [FB-Team-move-towards-target]
+    if (FB-Team-Explorer-onState-waitForCompanions)   [FB-Team-wander-around-target 5]
+    if (FB-Team-Explorer-onState-goToEnemyBase)       [FB-Team-move-towards-xy (xcor + 10) (item 1 mem0)] ;; Se déplce uniquement sur x
+    if (FB-Team-Explorer-onState-suicideOnBase)       [FB-Team-suicideOnTarget]
+  ]
 end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -546,20 +560,32 @@ to FB-Team-Explorer-handleGoNextToBase
     if (b != nobody) [
       FB-Team-set-target-xy ([item 0 mem0] of b) ([item 1 mem0] of b)
       FB-Team-Explorer-setState-goNextToBase
+      set mem3 list ([xcor] of b) ([ycor] of b)
     ]
   ]
 end
 
+to FB-Team-Explorer-handleGoBetweenBases
+  if (FB-Team-on-State-BasicState) [
+    let b0 min-one-of my-bases [distance myself]
+    let b1 max-one-of my-bases [distance myself]
+    FB-Team-set-target-xy ([xcor] of b0) ([ycor] of b0 + 0.5 * ([ycor] of b1)) / 2
+    FB-Team-Explorer-setState-goBetweenBases
+    set mem3 list ([xcor] of b0) ([ycor] of b0)
+  ]
+end
+
 to FB-Team-Explorer-handleWaitForCompanions
-  if (FB-Team-Explorer-onState-goNextToBase and 
+  if ((FB-Team-Explorer-onState-goNextToBase or FB-Team-Explorer-onState-goBetweenBases) and 
     (FB-Team-Distance-To-Target < 5)) [ ;; On passe à l'état suivant si on est dans un rayon de 5 du point d'attente
     FB-Team-Explorer-setState-waitForCompanions
   ]
 end
 
 to FB-Team-Explorer-handleGoToEnemyBase
+  let myType (item 0 mem1)
   if (FB-Team-Explorer-onState-waitForCompanions and
-    count (perceive-specific-robots color Explorers) with [(item 0 mem1) = 2] >= 8) [ ;; On passe à l'état suivant si il y a 10 companions au moins
+    count (perceive-specific-robots color Explorers) with [(item 0 mem1) = myType] >= 8) [ ;; On passe à l'état suivant si il y a 10 companions au moins
     FB-Team-explorer-setState-goToEnemyBase
   ]
 end
@@ -567,9 +593,18 @@ end
 to FB-Team-Explorer-handleTrampleOnPlantation
   if (FB-Team-Explorer-onState-goToEnemyBase) [
     let b min-one-of (perceive-base ennemy) [ distance myself ]
-    if (b != nobody) [ ;; On passe à l'état écrasement si on perçoit la plantation adverse
+    ifelse (b != nobody) [ ;; On passe à l'état écrasement si on perçoit la plantation adverse
       FB-Team-set-target-xy ([xcor] of b) ([ycor] of b)
       FB-Team-explorer-setState-trampleOnPlantation
+    ][
+      if (abs(xcor - (- (item 0 mem3))) < 5) [
+        FB-Team-set-target-xy xcor (ycor + 10)
+        let b1 max-one-of (perceive-base ennemy) [ distance myself ]
+        if (b1 != nobody) [ 
+          FB-Team-set-target-xy ([xcor] of b1) ([ycor] of b1)
+          FB-Team-explorer-setState-suicideOnBase
+        ]
+      ]
     ]
   ]
 end
@@ -577,9 +612,24 @@ end
 to FB-Team-Explorer-handleSuicideOnBase
   ;; On passe à l'état suicide si notre énergie est inférieure à celle qui nous faudrait pour rejoindre la base adverse, avec une chance de nous tirer dessus de 25%
   ;; et une sécurité de 0.5
-  if (FB-Team-Explorer-onState-trampleOnPlantation and
-    energy < (FB-Team-Distance-To-Target * (explorer-metabolism + missile-robot-damage / 4) + 0.5)) [
-    FB-Team-explorer-setState-suicideOnBase
+  let myType (item 0 mem1)
+  if (((FB-Team-Explorer-onState-trampleOnPlantation and FB-Team-getType = 2) and energy < (FB-Team-Distance-To-Target * (explorer-metabolism + missile-robot-damage / 8) + 0.5))
+    or ((FB-Team-Explorer-onState-trampleOnPlantation and FB-Team-getType = 2) and (count (perceive-specific-robots color Explorers) with [(item 0 mem1) = myType] >= 20))
+    or (FB-Team-Explorer-onState-goToEnemyBase and FB-Team-getType = 3)) [
+    let b0 min-one-of (perceive-base ennemy) [ distance myself ]
+    ifelse (b0 != nobody) [ 
+      FB-Team-set-target-xy ([xcor] of b0) ([ycor] of b0)
+      FB-Team-explorer-setState-suicideOnBase
+    ][
+      if (abs(xcor - (- (item 0 mem3))) < 5) [
+        FB-Team-set-target-xy xcor (ycor + 10)
+        let b1 max-one-of (perceive-base ennemy) [ distance myself ]
+        if (b1 != nobody) [ 
+          FB-Team-set-target-xy ([xcor] of b1) ([ycor] of b1)
+          FB-Team-explorer-setState-suicideOnBase
+        ]
+      ]
+    ]
   ]
 end
 
@@ -643,6 +693,14 @@ end
 
 to-report FB-Team-Explorer-onState-waitForCompanions
   report item 1 mem1 = 201 
+end
+
+to FB-Team-Explorer-setState-goBetweenBases
+  set mem1 replace-item 1 mem1 301 
+end
+
+to-report FB-Team-Explorer-onState-goBetweenBases
+  report item 1 mem1 = 301 
 end
 
 to FB-Team-Explorer-setState-goNextToBase
@@ -851,6 +909,18 @@ end
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+to-report FB-Team-Base-explorersCreated [ t ]
+  report (item t (item 5 mem1))
+end
+
+to-report FB-Team-Base-harvestersCreated [ t ]
+  report (item t (item 6 mem1))
+end
+
+to-report FB-Team-Base-rocketLaunchersCreated [ t ]
+  report (item t (item 7 mem1))
+end
+
 to FB-Team-Base-incrementCreationList [ index t num ]
   let creationList (item index mem1)
   set creationList replace-item t creationList ((item t creationList) + num) 
@@ -967,6 +1037,20 @@ to goRedBase
   FB-Team-Base-new-robot-if-should  
   FB-Team-base-try-select-ennemi-target-and-shoot
   FB-Team-drive-harvesters-on-perceive-food
+  
+  if ((FB-Team-Base-explorersCreated 3) = 15 and ((FB-Team-Base-harvestersCreated 0) < 7)) [
+    FB-Team-Base-createExplorersWhenPossible 0 1 ;;créer 3 explorer de type 0
+    FB-Team-Base-createHarvestersWhenPossible 0 1 ;;créer 7 harverster de type 0
+  ]
+  if ((FB-Team-Base-harvestersCreated 0) = 7 and energy > 12000) [
+    FB-Team-Base-createExplorersWhenPossible 2 10
+  ]
+  if ((FB-Team-Base-Tick >= 2000) and (FB-Team-Base-Tick mod 2000) = 0) [ set mem4 1 ]
+  if (mem4 = 1 and energy > 10000) [ 
+    FB-Team-Base-createExplorersWhenPossible 3 8 
+    set mem4 0
+  ]
+  
   ;;new-missile 1
   ;;new-faf 1
 end  
@@ -1010,6 +1094,7 @@ end
 ;;   0 : nonbre d'explorer de type 0 à créer
 ;;   1 : nombre d'explorer de type 1 à créer
 ;;   2 : nombre d'explorer de type 2 à créer
+;;   3 : nombre d'explorer de type 3 à créer
 ;; 2 : nombre d’harverster a crée 
 ;;   0 : nonbre de harvester de type 0 à créer
 ;; 3 : nombre de roketluncher a crée
@@ -1023,21 +1108,21 @@ to initRedBase
   set mem0 list (xcor + 10) ycor
   set mem1 [
     0        ;; Ticks
-    [0 0 0]  ;; Explorers à créer
+    [0 0 0 0];; Explorers à créer
     [0]      ;; Harvesters à créer
     [0 0]    ;; RocketLaunchers à créer
     0        ;; ??
-    [0 0 0]  ;; Explorrs créés
+    [0 0 0 0]  ;; Explorrs créés
     [0]      ;; Harvesters créés
     [0 0]    ;; RocketLaunchers créés
     0        ;; Type du prochain robot
   ] ;; 8 
   set mem1 FB-Team-Increment-List mem1 0 1 ;; intit tick
   ;;FB-Team-Base-createExplorersWhenPossible 0 5 ;;créer 5 explorer de type 0
-  ;;FB-Team-Base-createExplorersWhenPossible 2 10 ;;créer 10 explorer de type 2
   ;;FB-Team-Base-createHarvestersWhenPossible 0 5 ;;créer 5 harverster de type 0
   ;;FB-Team-Base-createRocketLaunchersWhenPossible 0 5 ;;créer 5 roketluncher de type 0
   ;;FB-Team-Base-createRocketLaunchersWhenPossible 1 10
-  FB-Team-Base-createRocketLaunchersWhenPossible 1 3
-  FB-Team-Base-createExplorersWhenPossible 1 3
+  ;;FB-Team-Base-createRocketLaunchersWhenPossible 1 3
+  ;;FB-Team-Base-createExplorersWhenPossible 1 3
+  FB-Team-Base-createExplorersWhenPossible 3 15
 end
