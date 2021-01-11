@@ -529,7 +529,6 @@ to FB-Team-Explorer-movement
   ]
   
   if (FB-Team-getType = 1) [
-    ;;if (FB-Team-Explorer-onState-searchForAloneRL)    []
   ]
   
   if (FB-Team-getType = 2) [
@@ -610,7 +609,7 @@ to FB-Team-Explorer-handleTrampleOnPlantation
 end
 
 to FB-Team-Explorer-handleSuicideOnBase
-  ;; On passe à l'état suicide si notre énergie est inférieure à celle qui nous faudrait pour rejoindre la base adverse, avec une chance de nous tirer dessus de 25%
+  ;; On passe à l'état suicide si notre énergie est inférieure à celle qui nous faudrait pour rejoindre la base adverse, avec une chance de nous tirer dessus de 12,5%
   ;; et une sécurité de 0.5
   let myType (item 0 mem1)
   if (((FB-Team-Explorer-onState-trampleOnPlantation and FB-Team-getType = 2) and energy < (FB-Team-Distance-To-Target * (explorer-metabolism + missile-robot-damage / 8) + 0.5))
@@ -654,15 +653,6 @@ to FB-Team-Explorer-handleSearchForAloneRL
     ]
   ]
 end
-
-to FB-Team-Explorer-handleTryFollowEnemy
-  let enemy min-one-of perceive-robots ennemy [ distance myself ]
-  ifelse (enemy != nobody) [
-    
-  ][
-    FB-Team-Explorer-setState-searchForAloneRL
-  ]
-end
   
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -677,14 +667,6 @@ end
 
 to-report FB-Team-Explorer-onState-searchForAloneRL
   report item 1 mem1 = 101 
-end
-
-to FB-Team-Explorer-setState-tryFollowEnemy
-  set mem1 replace-item 1 mem1 102 
-end
-
-to-report FB-Team-Explorer-onState-tryFollowEnemy
-  report item 1 mem1 = 102 
 end
 
 to FB-Team-Explorer-setState-waitForCompanions
