@@ -426,7 +426,7 @@ to-report FB-Team-on-State-ShouldGoBase
   report item 1 mem1 = 1
 end 
 
-to-report FB-Tem-Report-State
+to-report FB-Team-Report-State
   report item 1 mem1
 end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -465,7 +465,7 @@ to FB-Team-Refiull-energie
     ]
 end
 
-to FB-Ream-Restock-misiles [ n ] ;;n number of misilse 
+to FB-Team-Restock-misiles [ n ] ;;n number of misilse 
     new-missile n
 end
 
@@ -830,7 +830,7 @@ to goRedRocketLauncher
     FB-Team-Refiull-energie
     if(nb-missiles = 0 )
     [
-      FB-Ream-Restock-misiles 5 ;;; todo calculer le nombre de misilses a restock 
+      FB-Team-Restock-misiles 5 ;;; todo calculer le nombre de misilses a restock 
     ]
   ]
   
